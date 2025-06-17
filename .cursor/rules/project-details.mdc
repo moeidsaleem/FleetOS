@@ -1,0 +1,29 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+Title: Create the Driver Scoring Module for Mr.Nice Drive
+Description: Mr.Nice Drive is a limousine company currently operating in Dubai they have Uber Fleet API access with over 60 drivers however its getting hard to rank drivers and get more inforamtion. secondly most imporatant we want to alert driver through whatsapp/call/telegram if they are not performing. Build a module that calculates a driver score using weighted metrics like acceptance rate, idle ratio, cancellation rate, feedback score, and trip volume.
+Input:
+- A JSON object per driver like:
+  {
+    "acceptanceRate": 0.85,
+    "cancellationRate": 0.1,
+    "completionRate": 0.9,
+    "feedbackScore": 4.7,
+    "tripVolumeIndex": 0.75,
+    "idleRatio": 0.2
+  }
+Output:
+- A single score value between 0 and 1
+Constraints:
+- Use the following weight formula:
+  score = (acceptanceRate * 0.3) + ((1 - cancellationRate) * 0.2) + (completionRate * 0.15) + (feedbackScore / 5 * 0.15) + (tripVolumeIndex * 0.1) + ((1 - idleRatio) * 0.1)
+- Write this as a reusable TypeScript function inside `libs/driver-scoring/index.ts`
+
+
+Technology
+- Use Shadcn and tailwind css 
+- Zod 
+- Next.js v15 (app router)

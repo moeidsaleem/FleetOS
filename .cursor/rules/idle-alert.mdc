@@ -1,0 +1,14 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+Title: Generate Idle Alerts for Drivers
+Description: Check if any driver has been idle for more than 20 minutes and create an alert message.
+Input:
+- A list of driver tracking records with timestamps and last movement time
+Output:
+- An array of alerts:
+  [{ driverId: "uuid", message: "You've been idle for 25 minutes." }]
+Constraints:
+- Only flag drivers with `engineStatus: 'on'` and no location change in last 20 mins

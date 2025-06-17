@@ -1,0 +1,16 @@
+# Copy this content to a new file called .env.local in your project root
+
+# ElevenLabs Conversational AI Configuration
+# Get your API key from: https://elevenlabs.io/app/api-keys
+ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
+
+# These will be set after running the setup script
+ELEVENLABS_AGENT_ID=your_agent_id_here
+ELEVENLABS_AGENT_PHONE_NUMBER_ID=your_phone_number_id_here
+
+# Database (if you haven't set this up yet)
+# DATABASE_URL="your_database_url_here"
+
+# Next.js (if you haven't set this up yet)
+# NEXTAUTH_SECRET="your_nextauth_secret_here"
+# NEXTAUTH_URL="http://localhost:3000" 

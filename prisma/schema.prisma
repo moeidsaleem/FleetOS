@@ -1,0 +1,168 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Driver {
+  id              String   @id @default(uuid())
+  uberDriverId    String   @unique
+  name            String
+  phone           String
+  whatsappNumber  String?
+  telegramUserId  String?
+  email           String   @unique
+  language        Language @default(ENGLISH)
+  status          DriverStatus @default(ACTIVE)
+  joinedAt        DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  metrics         DriverMetrics[]
+  alerts          AlertRecord[]
+  
+  @@map("drivers")
+}
+
+model DriverMetrics {
+  id               String   @id @default(uuid())
+  driverId         String
+  date             DateTime @db.Date
+  acceptanceRate   Float
+  cancellationRate Float
+  completionRate   Float
+  feedbackScore    Float
+  tripVolumeIndex  Float
+  idleRatio        Float
+  calculatedScore  Float
+  createdAt        DateTime @default(now())
+
+  // Relations
+  driver           Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@unique([driverId, date])
+  @@map("driver_metrics")
+}
+
+model AlertRecord {
+  id          String       @id @default(uuid())
+  driverId    String
+  alertType   AlertType
+  priority    AlertPriority
+  reason      String
+  message     String
+  status      AlertStatus  @default(PENDING)
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  readAt      DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  // Relations
+  driver      Driver       @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@map("alert_records")
+}
+
+model AlertRule {
+  id              String   @id @default(uuid())
+  name            String
+  description     String
+  isActive        Boolean  @default(true)
+  conditions      Json     // Store alert conditions as JSON
+  actions         Json     // Store alert actions as JSON
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("alert_rules")
+}
+
+model NotificationTemplate {
+  id          String      @id @default(uuid())
+  name        String
+  type        AlertType
+  subject     String?
+  content     String
+  variables   String[]
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@map("notification_templates")
+}
+
+model SystemConfig {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("system_config")
+}
+
+model UberSyncLog {
+  id          String      @id @default(uuid())
+  syncType    String      // 'drivers', 'trips', 'metrics'
+  status      SyncStatus
+  recordsProcessed Int    @default(0)
+  errors      Json?       // Store any errors as JSON
+  startedAt   DateTime
+  completedAt DateTime?
+  createdAt   DateTime    @default(now())
+
+  @@map("uber_sync_logs")
+}
+
+// Enums
+enum DriverStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum Language {
+  ENGLISH
+  ARABIC
+  HINDI
+  URDU
+  FRENCH
+  RUSSIAN
+  TAGALOG
+  SPANISH
+}
+
+enum AlertType {
+  WHATSAPP
+  TELEGRAM
+  CALL
+  EMAIL
+}
+
+enum AlertStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+  READ
+}
+
+enum AlertPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum SyncStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+} 
