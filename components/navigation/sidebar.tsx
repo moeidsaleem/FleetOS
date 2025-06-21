@@ -3,7 +3,6 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '../../lib/utils'
 import { Button } from '../ui/button'
-import { Separator } from '../ui/separator'
 import { Badge } from '../ui/badge'
 import { 
   Home,
@@ -23,7 +22,6 @@ import {
   FileText,
   Database,
   Globe,
-  HelpCircle,
   LogOut
 } from 'lucide-react'
 
@@ -151,7 +149,7 @@ export function Sidebar({ className }: SidebarProps) {
 
   return (
     <div className={cn(
-      "flex flex-col bg-white border-r border-gray-200 transition-all duration-300",
+      "flex flex-col border-r border-gray-200 transition-all duration-300 bg-gradient-to-b from-blue-50 via-white to-purple-50 shadow-xl",
       isCollapsed ? "w-16" : "w-72",
       className
     )}>
@@ -173,7 +171,7 @@ export function Sidebar({ className }: SidebarProps) {
           variant="ghost"
           size="sm"
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="h-8 w-8 p-0"
+          className="h-8 w-8 p-0 hover:bg-blue-100 transition-colors"
         >
           {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </Button>
@@ -199,88 +197,50 @@ export function Sidebar({ className }: SidebarProps) {
         </div>
       )}
 
-      {/* Navigation Menu */}
-      <nav className="flex-1 overflow-y-auto p-4 space-y-6">
-        {menuItems.map((section, sectionIndex) => (
-          <div key={sectionIndex} className="space-y-2">
-            {!isCollapsed && (
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-2">
-                {section.title}
-              </h3>
-            )}
-            <div className="space-y-1">
-              {section.items.map((item, itemIndex) => {
-                const isActive = pathname === item.href || 
-                  (item.href !== '/' && pathname.startsWith(item.href))
-                
-                return (
-                  <Link key={itemIndex} href={item.href}>
-                    <div className={cn(
-                      "flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 group",
-                      isActive
-                        ? "bg-blue-50 text-blue-700 border border-blue-200"
-                        : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
-                    )}>
-                      <item.icon className={cn(
-                        "h-5 w-5 transition-colors",
-                        isActive ? "text-blue-600" : "text-gray-500 group-hover:text-gray-700"
-                      )} />
-                      {!isCollapsed && (
-                        <>
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <span>{item.title}</span>
-                              {item.badge && (
-                                <Badge 
-                                  variant={item.badge === 'Warning' ? 'destructive' : 'default'}
-                                  className="h-4 text-xs ml-2"
-                                >
-                                  {item.badge === 'Warning' ? '!' : '●'}
-                                </Badge>
-                              )}
-                            </div>
-                            <p className="text-xs text-gray-500 mt-0.5">
-                              {item.description}
-                            </p>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </Link>
-                )
-              })}
+      {/* Menu */}
+      <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-4">
+        {menuItems.map((section, sectionIdx) => (
+          <div key={sectionIdx} className="space-y-1">
+            <div className="text-xs font-semibold text-gray-400 uppercase px-2 mb-2 tracking-wider">
+              {section.title}
             </div>
-            {sectionIndex < menuItems.length - 1 && !isCollapsed && (
-              <Separator className="my-4" />
-            )}
+            {section.items.map((item, itemIdx) => {
+              const isActive = pathname === item.href
+              return (
+                <Link key={itemIdx} href={item.href} legacyBehavior>
+                  <a
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2 rounded-xl text-gray-700 hover:bg-blue-200/60 hover:shadow-lg transition-all duration-200 group",
+                      isActive && "bg-blue-200/80 text-blue-700 font-bold shadow-lg scale-[1.03]"
+                    )}
+                  >
+                    <item.icon className="h-5 w-5 flex-shrink-0 transition-transform group-hover:scale-110" />
+                    <span className={cn(
+                      "flex-1 text-base truncate",
+                      isCollapsed && "hidden"
+                    )}>{item.title}</span>
+                    {item.badge && !isCollapsed && (
+                      <Badge variant={item.badge === 'Warning' ? 'destructive' : 'default'} className="ml-2 text-xs">
+                        {item.badge}
+                      </Badge>
+                    )}
+                  </a>
+                </Link>
+              )
+            })}
           </div>
         ))}
       </nav>
 
       {/* Footer */}
-      <div className="border-t border-gray-100 p-4">
-        {!isCollapsed ? (
-          <div className="space-y-2">
-            <Button variant="ghost" className="w-full justify-start text-sm">
-              <HelpCircle className="h-4 w-4 mr-3" />
-              Help & Support
-            </Button>
-            <Button variant="ghost" className="w-full justify-start text-sm text-red-600 hover:text-red-700">
-              <LogOut className="h-4 w-4 mr-3" />
-              Sign Out
-            </Button>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <Button variant="ghost" size="sm" className="w-full p-2">
-              <HelpCircle className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="sm" className="w-full p-2 text-red-600">
-              <LogOut className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
-      </div>
+      {!isCollapsed && (
+        <div className="p-4 border-t border-gray-100 mt-auto">
+          <Button variant="ghost" size="sm" className="w-full flex items-center gap-2 text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors">
+            <LogOut className="h-4 w-4" />
+            Logout
+          </Button>
+        </div>
+      )}
     </div>
   )
 } 

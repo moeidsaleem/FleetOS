@@ -18,11 +18,12 @@ import {
   Phone, 
   MessageSquare,
   Send,
-  Target,
   Activity
 } from 'lucide-react'
 import { LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import Link from 'next/link'
+import StatCard from '../../components/magicui/StatCard'
+import WelcomeText from '../../components/magicui/WelcomeText'
 
 interface DashboardStats {
   totalDrivers: number
@@ -110,13 +111,6 @@ export default function DashboardPage() {
     fetchDashboardData(timeRange)
   }, [timeRange])
 
-  const getScoreColor = (score: number) => {
-    if (score >= 0.9) return 'text-green-600'
-    if (score >= 0.8) return 'text-yellow-600'
-    if (score >= 0.7) return 'text-orange-600'
-    return 'text-red-600'
-  }
-
   const getScoreBadgeVariant = (score: number) => {
     if (score >= 0.9) return 'default'
     if (score >= 0.8) return 'secondary'
@@ -149,11 +143,11 @@ export default function DashboardPage() {
   return (
     <DashboardLayout>
       <div className="container mx-auto p-6 space-y-6">
+        <WelcomeText name="Cheikh" />
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold">Mr. Nice Drive Dashboard</h1>
-            <p className="text-muted-foreground">Driver Performance & Alert Management</p>
+            <p className="text-muted-foreground">See what&apos;s happening with your drivers.</p>
           </div>
           <div className="flex items-center gap-4">
             <Link href="/dashboard/drivers">
@@ -185,84 +179,34 @@ export default function DashboardPage() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Drivers</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <Skeleton className="h-8 w-16" />
-              ) : (
-                <>
-                  <div className="text-2xl font-bold">{stats?.totalDrivers || 0}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {stats?.activeDrivers || 0} active
-                  </p>
-                </>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Average Score</CardTitle>
-              <Target className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <Skeleton className="h-8 w-16" />
-              ) : (
-                <>
-                  <div className={`text-2xl font-bold ${getScoreColor(stats?.averageScore || 0)}`}>
-                    {Math.round((stats?.averageScore || 0) * 100)}%
-                  </div>
-                  <Progress 
-                    value={(stats?.averageScore || 0) * 100} 
-                    className="mt-2" 
-                  />
-                </>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Alerts Sent</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <Skeleton className="h-8 w-16" />
-              ) : (
-                <>
-                  <div className="text-2xl font-bold">{stats?.alertsSent || 0}</div>
-                  <p className="text-xs text-muted-foreground">
-                    In selected period
-                  </p>
-                </>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Trip Status</CardTitle>
-              <Car className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <Skeleton className="h-8 w-16" />
-              ) : (
-                <>
-                  <div className="text-2xl font-bold">{stats?.tripsCompleted || 0}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {stats?.tripsInProgress || 0} in progress
-                  </p>
-                </>
-              )}
-            </CardContent>
-          </Card>
+          <StatCard
+            icon={<Users className="h-6 w-6" />}
+            label="Total Drivers"
+            value={loading ? '' : stats?.totalDrivers || 0}
+            sublabel={loading ? '' : `${stats?.activeDrivers || 0} active`}
+            loading={loading}
+          />
+          <StatCard
+            icon={<TrendingUp className="h-6 w-6" />}
+            label="Average Score"
+            value={loading ? '' : stats?.averageScore ? `${(stats.averageScore * 100).toFixed(1)}%` : '0%'}
+            sublabel={loading ? '' : 'Fleet average'}
+            loading={loading}
+          />
+          <StatCard
+            icon={<AlertTriangle className="h-6 w-6" />}
+            label="Alerts Sent"
+            value={loading ? '' : stats?.alertsSent || 0}
+            sublabel={loading ? '' : `Last ${timeRange}`}
+            loading={loading}
+          />
+          <StatCard
+            icon={<Car className="h-6 w-6" />}
+            label="Trips Completed"
+            value={loading ? '' : stats?.tripsCompleted || 0}
+            sublabel={loading ? '' : `${stats?.tripsInProgress || 0} in progress`}
+            loading={loading}
+          />
         </div>
 
         {/* Main Content Tabs */}

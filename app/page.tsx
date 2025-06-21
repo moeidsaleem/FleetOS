@@ -13,12 +13,13 @@ import {
   Database,
   BarChart3,
   Settings,
-  ArrowRight,
   CheckCircle,
   TrendingUp,
   Users,
   Activity
 } from 'lucide-react'
+import Hero from '../components/magicui/Hero'
+import FeatureGrid from '../components/magicui/FeatureGrid'
 
 export default function HomePage() {
   const features = [
@@ -83,7 +84,7 @@ export default function HomePage() {
                   <span className="text-xs text-gray-500">Fleet Management System</span>
                 </div>
               </div>
-              <Badge variant="secondary" className="text-xs">v2.0</Badge>
+              <Badge variant="secondary" className="text-xs">v0.2.0</Badge>
             </div>
             <div className="flex items-center space-x-4">
               {navigationItems.map((item, index) => (
@@ -106,39 +107,7 @@ export default function HomePage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="py-20">
-        <div className="container mx-auto px-6 text-center">
-          <div className="max-w-4xl mx-auto space-y-8">
-            <div className="space-y-4">
-              <h1 className="text-5xl font-bold text-gray-900 leading-tight">
-                Advanced Driver 
-                <span className="text-blue-600"> Performance </span>
-                Tracking
-              </h1>
-              <p className="text-xl text-gray-600 leading-relaxed">
-                Real-time monitoring and smart alerting system for 60+ limousine drivers in Dubai. 
-                Boost performance with data-driven insights and automated interventions.
-              </p>
-            </div>
-            
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/dashboard">
-                <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-lg px-8">
-                  <BarChart3 className="h-5 w-5 mr-2" />
-                  View Dashboard
-                  <ArrowRight className="h-5 w-5 ml-2" />
-                </Button>
-              </Link>
-              <Link href="/dashboard/drivers">
-                <Button variant="outline" size="lg" className="text-lg px-8">
-                  <Users className="h-5 w-5 mr-2" />
-                  Manage Drivers
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
+      <Hero />
 
       {/* Quick Stats */}
       <section className="py-16 bg-white/50">
@@ -204,45 +173,7 @@ export default function HomePage() {
       </section>
 
       {/* Features Grid */}
-      <section className="py-20">
-        <div className="container mx-auto px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Comprehensive Driver Management</h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Our advanced system combines real-time scoring, smart alerts, and detailed analytics 
-              to optimize your fleet performance
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {features.map((feature, index) => (
-              <Card key={index} className="p-6 hover:shadow-xl transition-all duration-300 border-0 bg-white/80 backdrop-blur-sm">
-                <CardHeader className="pb-4">
-                  <div className="flex items-center space-x-4">
-                    <div className="p-3 bg-blue-100 rounded-lg">
-                      <feature.icon className="h-6 w-6 text-blue-600" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-xl">{feature.title}</CardTitle>
-                      <CardDescription className="text-base">{feature.description}</CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-2">
-                    {feature.details.map((detail, detailIndex) => (
-                      <li key={detailIndex} className="flex items-center text-sm text-gray-600">
-                        <CheckCircle className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
-                        {detail}
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
+      <FeatureGrid features={features} />
 
       {/* Footer */}
       <footer className="bg-gray-900 text-white py-12">

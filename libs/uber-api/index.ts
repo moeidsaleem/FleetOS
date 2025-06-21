@@ -92,19 +92,6 @@ export class UberFleetAPI {
   }
 
   /**
-   * List trips (vehicle-suppliers)
-   */
-  async listTrips(orgId?: string, params: Record<string, any> = {}): Promise<any> {
-    const client = await this.getClient()
-    // Use hardcoded org ID if not provided
-    const response = await client.get(`/vehicle-suppliers/trips`, {
-      params: { org_id: orgId || HARDCODED_UBER_ORG_ID, ...params },
-    })
-    console.log('Uber API listTrips response:', response.data)
-    return response.data
-  }
-
-  /**
    * Analytics data query (performance reports)
    */
   async analyticsDataQuery(body: any): Promise<any> {
@@ -223,11 +210,42 @@ export class UberFleetAPI {
   async getTrips(startDate?: Date, endDate?: Date): Promise<any[]> {
     const orgId = process.env.UBER_ORG_ID
     if (!orgId) throw new Error('UBER_ORG_ID must be set in env')
+
+    const drivers = await this.listDrivers(orgId)
+    if (!drivers || drivers.length === 0) {
+      return []
+    }
+
     const params: Record<string, any> = {}
     if (startDate) params.start_time = startDate.toISOString()
     if (endDate) params.end_time = endDate.toISOString()
-    const data = await this.listTrips(orgId, params)
-    return data.trips || data
+
+    const allTrips: any[] = []
+
+    const tripPromises = drivers.map(driver => {
+      // Assuming the driver object has a 'driverUuid' property
+      if (driver.driverUuid) {
+        return this.listTripsForDriver(driver.driverUuid, orgId, params)
+          .then(data => (data.trips && Array.isArray(data.trips) ? data.trips : []))
+          .catch(err => {
+            console.error(
+              `Failed to fetch trips for driver ${driver.driverUuid}:`,
+              err.message
+            )
+            return [] // Return empty array on error for a specific driver
+          })
+      }
+      return Promise.resolve([])
+    })
+
+    const tripsArrays = await Promise.all(tripPromises)
+    tripsArrays.forEach(trips => {
+      if (Array.isArray(trips)) {
+        allTrips.push(...trips)
+      }
+    })
+
+    return allTrips
   }
 }
 
