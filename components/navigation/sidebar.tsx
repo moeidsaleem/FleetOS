@@ -1,3 +1,5 @@
+"use client"
+
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -24,17 +26,12 @@ import {
   Globe,
   LogOut
 } from 'lucide-react'
+import MagicLogo from '../magicui/MagicLogo'
 
 const menuItems = [
   {
     title: 'Overview',
     items: [
-      {
-        title: 'Home',
-        href: '/',
-        icon: Home,
-        description: 'System overview and status'
-      },
       {
         title: 'Dashboard',
         href: '/dashboard',
@@ -149,21 +146,22 @@ export function Sidebar({ className }: SidebarProps) {
 
   return (
     <div className={cn(
-      "flex flex-col border-r border-gray-200 transition-all duration-300 bg-gradient-to-b from-blue-50 via-white to-purple-50 shadow-xl",
+      "flex flex-col transition-all duration-300 bg-card/80 shadow-xl backdrop-blur-lg border border-border animate-fadein",
       isCollapsed ? "w-16" : "w-72",
+      "rounded-r-3xl m-2 ml-0 h-[calc(100vh-1rem)]",
       className
     )}>
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-100">
+      <div className="flex items-center justify-between p-4 border-b border-border">
         <div className={cn(
           "flex items-center space-x-3 transition-opacity duration-300",
           isCollapsed && "opacity-0 w-0 overflow-hidden"
         )}>
           <div className="flex items-center space-x-2">
-            <Shield className="h-8 w-8 text-blue-600" />
+            <MagicLogo size={32} />
             <div className="flex flex-col">
-              <span className="text-lg font-bold text-gray-900">Mr. Nice Drive</span>
-              <span className="text-xs text-gray-500">Fleet Management</span>
+              <span className="text-lg font-bold text-foreground">Fleet OS</span>
+              <span className="text-xs text-muted-foreground">AI Fleet Management System</span>
             </div>
           </div>
         </div>
@@ -171,7 +169,7 @@ export function Sidebar({ className }: SidebarProps) {
           variant="ghost"
           size="sm"
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="h-8 w-8 p-0 hover:bg-blue-100 transition-colors"
+          className="h-8 w-8 p-0 hover:bg-muted transition-colors transform-gpu duration-300 hover:scale-110"
         >
           {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </Button>
@@ -179,18 +177,18 @@ export function Sidebar({ className }: SidebarProps) {
 
       {/* Quick Stats */}
       {!isCollapsed && (
-        <div className="p-4 border-b border-gray-100">
+        <div className="p-4 border-b border-border">
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-600">Active Drivers</span>
+              <span className="text-muted-foreground">Active Drivers</span>
               <span className="font-semibold text-green-600">62</span>
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-600">Pending Alerts</span>
+              <span className="text-muted-foreground">Pending Alerts</span>
               <Badge variant="destructive" className="h-5 text-xs">3</Badge>
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-600">System Status</span>
+              <span className="text-muted-foreground">System Status</span>
               <Badge variant="default" className="h-5 text-xs bg-green-500">Online</Badge>
             </div>
           </div>
@@ -199,43 +197,53 @@ export function Sidebar({ className }: SidebarProps) {
 
       {/* Menu */}
       <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-4">
-        {menuItems.map((section, sectionIdx) => (
-          <div key={sectionIdx} className="space-y-1">
-            <div className="text-xs font-semibold text-gray-400 uppercase px-2 mb-2 tracking-wider">
-              {section.title}
+        {menuItems.map((section, sectionIdx) => {
+          const SectionIcon = section.items[0]?.icon;
+          return (
+            <div key={sectionIdx} className="space-y-1">
+              <div className={cn(
+                "flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase px-2 mb-2 tracking-wider",
+                isCollapsed && "hidden"
+              )}>
+                {SectionIcon && <SectionIcon className="h-4 w-4 opacity-70" />} {section.title}
+              </div>
+              {section.items.map((item, itemIdx) => {
+                const isActive = pathname === item.href
+                return (
+                  <Link key={itemIdx} href={item.href} legacyBehavior>
+                    <a
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-2 rounded-xl text-foreground hover:bg-muted hover:shadow-lg transition-all duration-200 group relative overflow-hidden",
+                        isActive && "bg-muted font-bold shadow-lg scale-[1.03] ring-2 ring-blue-400/70 ring-offset-2 ring-offset-card before:absolute before:inset-0 before:bg-gradient-to-r before:from-blue-400/20 before:to-purple-400/20 before:blur before:opacity-60 before:rounded-xl"
+                      )}
+                    >
+                      <item.icon className="h-5 w-5 flex-shrink-0 transition-transform group-hover:scale-125 duration-200" />
+                      <span className={cn(
+                        "flex-1 text-base truncate",
+                        isCollapsed && "hidden"
+                      )}>{item.title}</span>
+                      {item.badge && !isCollapsed && (
+                        <Badge variant={item.badge === 'Warning' ? 'destructive' : 'default'} className="ml-2 text-xs">
+                          {item.badge}
+                        </Badge>
+                      )}
+                    </a>
+                  </Link>
+                )
+              })}
+              {/* Soft divider between sections */}
+              {sectionIdx < menuItems.length - 1 && !isCollapsed && (
+                <div className="my-3 h-px bg-gradient-to-r from-blue-200 via-card to-purple-200 opacity-40 rounded-full" />
+              )}
             </div>
-            {section.items.map((item, itemIdx) => {
-              const isActive = pathname === item.href
-              return (
-                <Link key={itemIdx} href={item.href} legacyBehavior>
-                  <a
-                    className={cn(
-                      "flex items-center gap-3 px-3 py-2 rounded-xl text-gray-700 hover:bg-blue-200/60 hover:shadow-lg transition-all duration-200 group",
-                      isActive && "bg-blue-200/80 text-blue-700 font-bold shadow-lg scale-[1.03]"
-                    )}
-                  >
-                    <item.icon className="h-5 w-5 flex-shrink-0 transition-transform group-hover:scale-110" />
-                    <span className={cn(
-                      "flex-1 text-base truncate",
-                      isCollapsed && "hidden"
-                    )}>{item.title}</span>
-                    {item.badge && !isCollapsed && (
-                      <Badge variant={item.badge === 'Warning' ? 'destructive' : 'default'} className="ml-2 text-xs">
-                        {item.badge}
-                      </Badge>
-                    )}
-                  </a>
-                </Link>
-              )
-            })}
-          </div>
-        ))}
+          )
+        })}
       </nav>
 
       {/* Footer */}
       {!isCollapsed && (
-        <div className="p-4 border-t border-gray-100 mt-auto">
-          <Button variant="ghost" size="sm" className="w-full flex items-center gap-2 text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors">
+        <div className="p-4 border-t border-border mt-auto">
+          <Button variant="ghost" size="sm" className="w-full flex items-center gap-2 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors">
             <LogOut className="h-4 w-4" />
             Logout
           </Button>

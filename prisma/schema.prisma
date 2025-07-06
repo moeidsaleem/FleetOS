@@ -120,6 +120,24 @@ model UberSyncLog {
   @@map("uber_sync_logs")
 }
 
+// AUTH: User model and Role enum
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(VIEWER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  emailVerified DateTime?
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  VIEWER
+}
+
 // Enums
 enum DriverStatus {
   ACTIVE

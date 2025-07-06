@@ -1,3 +1,5 @@
+"use client"
+
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ChevronRight, Home } from 'lucide-react'
@@ -35,7 +37,7 @@ export function Breadcrumb() {
     
     // Always start with home if not on home page
     if (pathname !== '/') {
-      breadcrumbs.push({ title: 'Home', href: '/' })
+      breadcrumbs.push({ title: 'Home', href: '/' }) // TODO: change to dashboard
     }
     
     // Build breadcrumbs from path segments
@@ -60,22 +62,22 @@ export function Breadcrumb() {
   if (breadcrumbs.length <= 1) return null
   
   return (
-    <nav className="flex items-center space-x-1 text-sm text-gray-500 mb-6">
-      <Home className="h-4 w-4" />
+    <nav className="flex items-center space-x-1 text-sm text-gray-500 dark:text-gray-400 mb-6">
+      <Home className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       {breadcrumbs.map((item, index) => (
         <div key={index} className="flex items-center space-x-1">
-          {index > 0 && <ChevronRight className="h-4 w-4" />}
+          {index > 0 && <ChevronRight className="h-4 w-4 text-gray-400 dark:text-gray-500" />}
           {item.href ? (
             <Link 
               href={item.href}
-              className="hover:text-gray-700 transition-colors"
+              className="hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
             >
               {item.title}
             </Link>
           ) : (
             <span className={cn(
               "font-medium",
-              item.isLast ? "text-gray-900" : "text-gray-500"
+              item.isLast ? "text-gray-900 dark:text-gray-100" : "text-gray-500 dark:text-gray-400"
             )}>
               {item.title}
             </span>

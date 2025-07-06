@@ -1,3 +1,5 @@
+"use client"
+
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -18,6 +20,7 @@ import {
   Target,
   X
 } from 'lucide-react'
+import MagicLogo from '../magicui/MagicLogo'
 
 const mobileMenuItems = [
   { title: 'Home', href: '/', icon: Home },
@@ -51,10 +54,10 @@ export function MobileNav() {
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b">
             <div className="flex items-center space-x-2">
-              <Shield className="h-6 w-6 text-blue-600" />
+              <MagicLogo size={32} />
               <div className="flex flex-col">
-                <span className="font-bold text-gray-900">Mr. Nice Drive</span>
-                <span className="text-xs text-gray-500">Fleet Management</span>
+                <span className="font-bold text-gray-900">Fleet OS</span>
+                <span className="text-xs text-gray-500">AI Fleet Management System</span>
               </div>
             </div>
             <Button 
@@ -121,7 +124,7 @@ export function MobileNav() {
           {/* Footer */}
           <div className="border-t p-4">
             <div className="text-center text-xs text-gray-500">
-              Mr. Nice Drive Fleet Management v1.0
+              Fleet OS v1.0
             </div>
           </div>
         </div>

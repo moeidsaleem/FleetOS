@@ -25,6 +25,9 @@ import {
   Users
 } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { RequireAuth } from '../../../../components/auth/require-auth'
+import React from 'react'
+import { DashboardLayout } from '../../../../components/layout/dashboard-layout'
 
 interface DriverDetail {
   driver: {
@@ -90,7 +93,17 @@ interface DriverDetail {
   }
 }
 
-export default function DriverDetailPage() {
+export default function ProtectedDriverDetailPage(props: React.ComponentPropsWithoutRef<'div'>) {
+  return (
+    <RequireAuth>
+      <DashboardLayout>
+        <DriverDetailPage {...props} />
+      </DashboardLayout>
+    </RequireAuth>
+  )
+}
+
+function DriverDetailPage(props: React.ComponentPropsWithoutRef<'div'>) {
   const params = useParams()
   const [driver, setDriver] = useState<DriverDetail | null>(null)
   const [loading, setLoading] = useState(true)
@@ -210,7 +223,7 @@ export default function DriverDetailPage() {
     })) : []
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">

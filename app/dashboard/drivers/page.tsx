@@ -11,6 +11,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Badge } from '../../../components/ui/badge'
 import { AlertCallModal } from '../../../components/ui/alert-call-modal'
 import { RefreshCw } from 'lucide-react'
+import { RequireAuth } from '../../../components/auth/require-auth'
+import React from 'react'
+import { DashboardLayout } from '../../../components/layout/dashboard-layout'
 
 interface Driver {
   id: string
@@ -53,7 +56,17 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue
 }
 
-export default function DriversPage() {
+export default function ProtectedDriversPage(props: React.ComponentPropsWithoutRef<'div'>) {
+  return (
+    <RequireAuth>
+      <DashboardLayout>
+        <DriversPage {...props} />
+      </DashboardLayout>
+    </RequireAuth>
+  )
+}
+
+export function DriversPage() {
   const [drivers, setDrivers] = useState<Driver[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -216,7 +229,7 @@ export default function DriversPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="space-y-6">
       {/* Header and Actions */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
