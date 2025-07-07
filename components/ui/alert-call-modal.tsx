@@ -255,7 +255,7 @@ export function AlertCallModal({ open, onOpenChange, driver }: AlertCallModalPro
                   </div>
                 </div>
                 <DialogFooter className="gap-2 mt-4">
-                  <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>Cancel</Button>
+                  <Button className=" text-black font-semibold dark:text-white disabled:bg-red-300 disabled:hover:bg-red-300" type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>Cancel</Button>
                   <Button type="submit" disabled={loading || !selectedReason || (selectedReason === 'custom' && !customMessage.trim())} className="min-w-[140px]">
                     {loading ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Initiating Call...</>) : (<><Phone className="h-4 w-4 mr-2" /> Start AI Call</>)}
                   </Button>
@@ -298,7 +298,7 @@ export function AlertCallModal({ open, onOpenChange, driver }: AlertCallModalPro
                   </>
                 )}
                 <DialogFooter className="gap-2 mt-4">
-                  <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>Cancel</Button>
+                  <Button className="" type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>Cancel</Button>
                   <Button type="submit" disabled={loading || !message.trim()} className={`min-w-[140px] ${tab === 'whatsapp' ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}>
                     {loading ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Sending...</>) : (<>{tab === 'whatsapp' ? <MessageSquare className="h-4 w-4 mr-2" /> : <Send className="h-4 w-4 mr-2" />} Send {tab === 'whatsapp' ? 'WhatsApp' : 'Telegram'}</>)}
                   </Button>

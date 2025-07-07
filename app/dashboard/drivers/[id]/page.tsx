@@ -22,12 +22,23 @@ import {
   Target,
   Activity,
   Zap,
-  Users
+  Users,
+  FileText,
+  RefreshCw
 } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { RequireAuth } from '../../../../components/auth/require-auth'
 import React from 'react'
 import { DashboardLayout } from '../../../../components/layout/dashboard-layout'
+import { Dialog, DialogContent, DialogFooter } from '../../../../components/ui/dialog'
+import { Input } from '../../../../components/ui/input'
+import { useToast } from '../../../../components/ui/use-toast'
+import { useRouter } from 'next/navigation'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../../components/ui/select'
+import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input'
+import 'react-phone-number-input/style.css'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../../components/ui/table'
+import { useSession } from 'next-auth/react'
 
 interface DriverDetail {
   driver: {
@@ -41,6 +52,7 @@ interface DriverDetail {
     uberDriverId?: string
     joinedAt: string
     updatedAt: string
+    language?: string
   }
   performance: {
     currentScore: number
@@ -93,6 +105,10 @@ interface DriverDetail {
   }
 }
 
+function validateEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+}
+
 export default function ProtectedDriverDetailPage(props: React.ComponentPropsWithoutRef<'div'>) {
   return (
     <RequireAuth>
@@ -109,6 +125,17 @@ function DriverDetailPage(props: React.ComponentPropsWithoutRef<'div'>) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [includeUberData, setIncludeUberData] = useState(false)
+  const { toast } = useToast()
+  const router = useRouter()
+  const [editOpen, setEditOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [editForm, setEditForm] = useState<any>(null)
+  const [editLoading, setEditLoading] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [editFieldErrors, setEditFieldErrors] = useState<{ [k: string]: string }>({})
+  const [editChecking, setEditChecking] = useState<{ email: boolean; uberDriverId: boolean }>({ email: false, uberDriverId: false })
+  const [editDuplicate, setEditDuplicate] = useState<{ email: boolean; uberDriverId: boolean }>({ email: false, uberDriverId: false })
+  const [syncing, setSyncing] = useState(false)
 
   const fetchDriverDetails = async () => {
     try {
@@ -139,6 +166,87 @@ function DriverDetailPage(props: React.ComponentPropsWithoutRef<'div'>) {
     fetchDriverDetails()
   }, [params.id, includeUberData])
 
+  useEffect(() => {
+    if (driver) {
+      setEditForm({
+        name: driver.driver.name,
+        email: driver.driver.email,
+        phone: driver.driver.phone,
+        status: driver.driver.status,
+        uberDriverId: driver.driver.uberDriverId || '',
+        language: driver.driver.language || 'ENGLISH',
+      })
+    }
+  }, [driver])
+
+  const handleEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEditForm({ ...editForm, [e.target.name]: e.target.value })
+    setEditFieldErrors({ ...editFieldErrors, [e.target.name]: '' })
+    setEditDuplicate({ ...editDuplicate, [e.target.name]: false })
+  }
+  const handleEditSelect = (field: string, value: string) => {
+    setEditForm({ ...editForm, [field]: value })
+  }
+  const handleEditPhoneChange = (value: string | undefined) => {
+    setEditForm({ ...editForm, phone: value || '' })
+    setEditFieldErrors({ ...editFieldErrors, phone: '' })
+  }
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const errors: { [k: string]: string } = {}
+    if (!editForm.name?.trim()) errors.name = 'Name is required.'
+    if (!editForm.email?.trim()) errors.email = 'Email is required.'
+    if (!editForm.phone?.trim()) errors.phone = 'Phone is required.'
+    else if (!isValidPhoneNumber(editForm.phone)) errors.phone = 'Invalid phone number.'
+    if (editDuplicate.email) errors.email = 'A driver with this email already exists.'
+    if (editDuplicate.uberDriverId) errors.uberDriverId = 'A driver with this Uber Driver ID already exists.'
+    if (Object.keys(errors).length > 0) {
+      setEditFieldErrors(errors)
+      return
+    }
+    if (!driver) return;
+    setEditLoading(true)
+    try {
+      const res = await fetch(`/api/drivers/${driver.driver.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editForm)
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        toast({ title: 'Error', description: data.error || 'Failed to update driver', variant: 'destructive' })
+        setEditLoading(false)
+        return
+      }
+      toast({ title: 'Driver Updated', description: 'Driver details updated successfully!' })
+      setEditOpen(false)
+      fetchDriverDetails()
+    } catch (err) {
+      toast({ title: 'Error', description: 'Failed to update driver', variant: 'destructive' })
+    } finally {
+      setEditLoading(false)
+    }
+  }
+  const handleDelete = async () => {
+    if (!driver) return;
+    setDeleteLoading(true)
+    try {
+      const res = await fetch(`/api/drivers/${driver.driver.id}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        toast({ title: 'Error', description: data.error || 'Failed to delete driver', variant: 'destructive' })
+        setDeleteLoading(false)
+        return
+      }
+      toast({ title: 'Driver Deleted', description: 'Driver has been deleted.' })
+      router.push('/dashboard/drivers')
+    } catch (err) {
+      toast({ title: 'Error', description: 'Failed to delete driver', variant: 'destructive' })
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
   const getScoreColor = (score: number) => {
     if (score >= 0.9) return 'text-green-600'
     if (score >= 0.8) return 'text-yellow-600'
@@ -163,6 +271,69 @@ function DriverDetailPage(props: React.ComponentPropsWithoutRef<'div'>) {
       case 'low': return 'bg-blue-500'
       default: return 'bg-gray-500'
     }
+  }
+
+  // Async duplicate check for email (edit)
+  const checkEditDuplicateEmail = async () => {
+    if (!editForm.email?.trim() || !validateEmail(editForm.email)) return
+    setEditChecking(c => ({ ...c, email: true }))
+    setEditDuplicate(d => ({ ...d, email: false }))
+    try {
+      const res = await fetch(`/api/drivers?email=${encodeURIComponent(editForm.email)}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data.data && Array.isArray(data.data)) {
+          // Exclude current driver
+          const found = data.data.find((d: any) => d.id !== driver?.driver.id)
+          if (found) {
+            setEditDuplicate(d => ({ ...d, email: true }))
+            setEditFieldErrors(e => ({ ...e, email: 'A driver with this email already exists.' }))
+          }
+        }
+      }
+    } catch {}
+    setEditChecking(c => ({ ...c, email: false }))
+  }
+
+  // Async duplicate check for Uber Driver ID (edit)
+  const checkEditDuplicateUberId = async () => {
+    if (!editForm.uberDriverId?.trim()) return
+    setEditChecking(c => ({ ...c, uberDriverId: true }))
+    setEditDuplicate(d => ({ ...d, uberDriverId: false }))
+    try {
+      const res = await fetch(`/api/drivers?uberDriverId=${encodeURIComponent(editForm.uberDriverId)}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data.data && Array.isArray(data.data)) {
+          // Exclude current driver
+          const found = data.data.find((d: any) => d.id !== driver?.driver.id)
+          if (found) {
+            setEditDuplicate(d => ({ ...d, uberDriverId: true }))
+            setEditFieldErrors(e => ({ ...e, uberDriverId: 'A driver with this Uber Driver ID already exists.' }))
+          }
+        }
+      }
+    } catch {}
+    setEditChecking(c => ({ ...c, uberDriverId: false }))
+  }
+
+  // Add re-sync handler
+  const handleResyncUber = async () => {
+    if (!driver?.driver.uberDriverId) return
+    setSyncing(true)
+    try {
+      const res = await fetch(`/api/drivers/${driver.driver.id}/sync-uber`, { method: 'POST' })
+      const data = await res.json()
+      if (data.success) {
+        toast({ title: 'Driver synced from Uber', variant: 'default' })
+        fetchDriverDetails()
+      } else {
+        toast({ title: 'Sync failed', description: data.error, variant: 'destructive' })
+      }
+    } catch (e) {
+      toast({ title: 'Sync error', description: String(e), variant: 'destructive' })
+    }
+    setSyncing(false)
   }
 
   if (error) {
@@ -242,19 +413,25 @@ function DriverDetailPage(props: React.ComponentPropsWithoutRef<'div'>) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button 
-            variant="outline"
-            onClick={() => setIncludeUberData(!includeUberData)}
-          >
+          <Button variant="outline" onClick={() => setIncludeUberData(!includeUberData)}>
             <Activity className="h-4 w-4 mr-2" />
             {includeUberData ? 'Hide' : 'Show'} Uber Data
           </Button>
-          <Badge 
-            variant={driver.driver.status === 'ACTIVE' ? 'default' : 'secondary'}
-            className={getStatusColor(driver.driver.status)}
-          >
+          <Button variant="outline" onClick={() => setEditOpen(true)}>
+            Edit
+          </Button>
+          <Button variant="destructive" onClick={() => setDeleteOpen(true)}>
+            Delete
+          </Button>
+          <Badge variant={driver.driver.status === 'ACTIVE' ? 'default' : 'secondary'} className={getStatusColor(driver.driver.status)}>
             {driver.driver.status}
           </Badge>
+          {driver.driver.uberDriverId && (
+            <Button onClick={handleResyncUber} disabled={syncing} variant="outline" className="flex items-center gap-2">
+              <RefreshCw className={syncing ? 'animate-spin' : ''} />
+              {syncing ? 'Syncing...' : 'Re-Sync from Uber'}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -329,6 +506,9 @@ function DriverDetailPage(props: React.ComponentPropsWithoutRef<'div'>) {
           <TabsTrigger value="alerts">Alerts</TabsTrigger>
           <TabsTrigger value="contact">Contact Info</TabsTrigger>
           {driver.uber && <TabsTrigger value="uber">Uber Data</TabsTrigger>}
+          <TabsTrigger value="documents">Documents</TabsTrigger>
+          <TabsTrigger value="notes">Notes</TabsTrigger>
+          <TabsTrigger value="activity">Activity</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -594,7 +774,462 @@ function DriverDetailPage(props: React.ComponentPropsWithoutRef<'div'>) {
             </div>
           </TabsContent>
         )}
+
+        <TabsContent value="documents" className="space-y-4">
+          <DriverDocuments driverId={driver.driver.id} />
+        </TabsContent>
+
+        <TabsContent value="notes" className="space-y-4">
+          <DriverNotes driverId={driver.driver.id} />
+        </TabsContent>
+
+        <TabsContent value="activity" className="space-y-4">
+          <DriverActivityTimeline driverId={driver.driver.id} />
+        </TabsContent>
       </Tabs>
+      {/* Edit Modal */}
+      {driver && (
+        <Dialog open={editOpen} onOpenChange={setEditOpen}>
+          <DialogContent>
+            <form onSubmit={handleEditSubmit} className="space-y-4">
+              <h2 className="text-xl font-bold mb-2">Edit Driver</h2>
+              <div className="space-y-2">
+                <label htmlFor="name" className="font-medium">Name</label>
+                <Input id="name" name="name" value={editForm?.name || ''} onChange={handleEditChange} required disabled={editLoading} />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="email" className="font-medium">Email</label>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  value={editForm?.email || ''}
+                  onChange={handleEditChange}
+                  onBlur={checkEditDuplicateEmail}
+                  required
+                  disabled={editLoading}
+                />
+                {editChecking.email && <p className="text-xs text-blue-600 mt-1">Checking for duplicate email...</p>}
+                {editFieldErrors.email && <p className="text-xs text-red-600 mt-1">{editFieldErrors.email}</p>}
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="phone" className="font-medium">Phone</label>
+                <PhoneInput
+                  id="phone"
+                  name="phone"
+                  value={editForm?.phone || ''}
+                  onChange={handleEditPhoneChange}
+                  defaultCountry="AE"
+                  international
+                  countryCallingCodeEditable={false}
+                  disabled={editLoading}
+                  className="rounded-lg border border-border px-3 py-2 w-full bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  placeholder="e.g. +971501234567"
+                />
+                {editFieldErrors.phone && <p className="text-xs text-red-600 mt-1">{editFieldErrors.phone}</p>}
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="uberDriverId" className="font-medium">Uber Driver ID</label>
+                <Input
+                  id="uberDriverId"
+                  name="uberDriverId"
+                  value={editForm?.uberDriverId || ''}
+                  onChange={handleEditChange}
+                  onBlur={checkEditDuplicateUberId}
+                  disabled={editLoading}
+                />
+                {editChecking.uberDriverId && <p className="text-xs text-blue-600 mt-1">Checking for duplicate Uber Driver ID...</p>}
+                {editFieldErrors.uberDriverId && <p className="text-xs text-red-600 mt-1">{editFieldErrors.uberDriverId}</p>}
+              </div>
+              <div className="space-y-2">
+                <label className="font-medium">Status</label>
+                <Select value={editForm?.status || 'ACTIVE'} onValueChange={v => handleEditSelect('status', v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ACTIVE">Active</SelectItem>
+                    <SelectItem value="INACTIVE">Inactive</SelectItem>
+                    <SelectItem value="SUSPENDED">Suspended</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="font-medium">Language</label>
+                <Select value={editForm?.language || 'ENGLISH'} onValueChange={v => handleEditSelect('language', v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select language" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ENGLISH">English</SelectItem>
+                    <SelectItem value="ARABIC">Arabic</SelectItem>
+                    <SelectItem value="HINDI">Hindi</SelectItem>
+                    <SelectItem value="URDU">Urdu</SelectItem>
+                    <SelectItem value="FRENCH">French</SelectItem>
+                    <SelectItem value="RUSSIAN">Russian</SelectItem>
+                    <SelectItem value="TAGALOG">Tagalog</SelectItem>
+                    <SelectItem value="SPANISH">Spanish</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setEditOpen(false)} disabled={editLoading}>Cancel</Button>
+                <Button type="submit" disabled={editLoading}>{editLoading ? 'Saving...' : 'Save Changes'}</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
+      {/* Delete Confirmation Dialog */}
+      {driver && (
+        <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+          <DialogContent>
+            <h2 className="text-xl font-bold mb-2">Delete Driver</h2>
+            <p>Are you sure you want to delete this driver? This action cannot be undone.</p>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleteLoading}>Cancel</Button>
+              <Button type="button" variant="destructive" onClick={handleDelete} disabled={deleteLoading}>{deleteLoading ? 'Deleting...' : 'Delete'}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+    </div>
+  )
+}
+
+function DriverDocuments({ driverId }: { driverId: string }) {
+  const [documents, setDocuments] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [file, setFile] = useState<File | null>(null)
+  const [type, setType] = useState('LICENSE')
+  const [expiryDate, setExpiryDate] = useState('')
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const { toast } = useToast()
+
+  const fetchDocuments = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/drivers/${driverId}/documents`)
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to fetch documents')
+      setDocuments(data.data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error')
+    } finally {
+      setLoading(false)
+    }
+  }
+  useEffect(() => { fetchDocuments() }, [driverId])
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFile(e.target.files?.[0] || null)
+    setUploadError(null)
+  }
+  const handleUpload = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setUploadError(null)
+    if (!file) { setUploadError('Please select a file.'); return }
+    setUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('type', type)
+      if (expiryDate) formData.append('expiryDate', expiryDate)
+      const res = await fetch(`/api/drivers/${driverId}/documents`, { method: 'POST', body: formData })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        setUploadError(data.error || 'Failed to upload document')
+        toast({ title: 'Upload failed', description: data.error || 'Failed to upload document', variant: 'destructive' })
+      } else {
+        toast({ title: 'Document uploaded', description: data.data.fileName + ' uploaded successfully!' })
+        setFile(null); setExpiryDate(''); setType('LICENSE')
+        fetchDocuments()
+      }
+    } catch (err) {
+      setUploadError('Failed to upload document')
+      toast({ title: 'Upload failed', description: 'Failed to upload document', variant: 'destructive' })
+    } finally {
+      setUploading(false)
+    }
+  }
+  const handleDelete = async () => {
+    if (!deleteId) return
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/drivers/${driverId}/documents/${deleteId}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        toast({ title: 'Delete failed', description: data.error || 'Failed to delete document', variant: 'destructive' })
+      } else {
+        toast({ title: 'Document deleted', description: 'Document deleted successfully.' })
+        fetchDocuments()
+      }
+    } catch {
+      toast({ title: 'Delete failed', description: 'Failed to delete document', variant: 'destructive' })
+    } finally {
+      setDeleting(false); setDeleteId(null)
+    }
+  }
+  const now = new Date()
+  return (
+    <div className="space-y-6">
+      <form onSubmit={handleUpload} className="flex flex-col md:flex-row gap-4 items-end bg-muted/30 p-4 rounded-xl border border-border">
+        <div className="flex flex-col gap-1">
+          <label className="font-medium">File</label>
+          <Input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} disabled={uploading} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="font-medium">Type</label>
+          <select className="rounded-lg border border-border px-3 py-2 bg-background" value={type} onChange={e => setType(e.target.value)} disabled={uploading}>
+            <option value="LICENSE">License</option>
+            <option value="EMIRATES_ID">Emirates ID</option>
+            <option value="VISA">Visa</option>
+            <option value="INSURANCE">Insurance</option>
+            <option value="OTHER">Other</option>
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="font-medium">Expiry Date</label>
+          <Input type="date" value={expiryDate} onChange={e => setExpiryDate(e.target.value)} disabled={uploading} />
+        </div>
+        <Button type="submit" disabled={uploading}>{uploading ? 'Uploading...' : 'Upload'}</Button>
+      </form>
+      {uploadError && <Alert variant="destructive"><AlertTitle>Error</AlertTitle><AlertDescription>{uploadError}</AlertDescription></Alert>}
+      <div className="overflow-x-auto rounded-2xl shadow-lg bg-card border border-border">
+        <Table className="min-w-full divide-y divide-border">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Type</TableHead>
+              <TableHead>File Name</TableHead>
+              <TableHead>Expiry</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Uploaded</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow><TableCell colSpan={6}>Loading...</TableCell></TableRow>
+            ) : error ? (
+              <TableRow><TableCell colSpan={6} className="text-red-600">{error}</TableCell></TableRow>
+            ) : documents.length === 0 ? (
+              <TableRow><TableCell colSpan={6} className="text-muted-foreground">No documents found.</TableCell></TableRow>
+            ) : (
+              documents.map(doc => {
+                const isExpired = doc.expiryDate && new Date(doc.expiryDate) < now
+                const isExpiring = doc.expiryDate && new Date(doc.expiryDate) < new Date(now.getTime() + 7*24*60*60*1000) && !isExpired
+                return (
+                  <TableRow key={doc.id} className={isExpired ? 'bg-red-50 dark:bg-red-900/20' : isExpiring ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''}>
+                    <TableCell><Badge variant="secondary">{doc.type}</Badge></TableCell>
+                    <TableCell>{doc.fileName}</TableCell>
+                    <TableCell>{doc.expiryDate ? new Date(doc.expiryDate).toLocaleDateString() : <span className="text-muted-foreground">N/A</span>}</TableCell>
+                    <TableCell><Badge variant={doc.status === 'VALID' ? 'default' : 'destructive'}>{doc.status}</Badge></TableCell>
+                    <TableCell>{new Date(doc.uploadedAt).toLocaleDateString()}</TableCell>
+                    <TableCell className="flex gap-2">
+                      <Button size="sm" variant="outline" asChild><a href={doc.filePath} target="_blank" rel="noopener noreferrer">Download</a></Button>
+                      <Button size="sm" variant="destructive" onClick={() => setDeleteId(doc.id)}>Delete</Button>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
+            )}
+          </TableBody>
+        </Table>
+      </div>
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteId} onOpenChange={v => { if (!v) setDeleteId(null) }}>
+        <DialogContent>
+          <h2 className="text-xl font-bold mb-2">Delete Document</h2>
+          <p>Are you sure you want to delete this document? This action cannot be undone.</p>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDeleteId(null)} disabled={deleting}>Cancel</Button>
+            <Button type="button" variant="destructive" onClick={handleDelete} disabled={deleting}>{deleting ? 'Deleting...' : 'Delete'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+function DriverActivityTimeline({ driverId }: { driverId: string }) {
+  const [activity, setActivity] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setLoading(true)
+    setError(null)
+    fetch(`/api/drivers/${driverId}/activity`)
+      .then(res => res.json())
+      .then(data => {
+        if (!data.success) throw new Error(data.error || 'Failed to fetch activity')
+        setActivity(data.data)
+      })
+      .catch(err => setError(err.message || 'Unknown error'))
+      .finally(() => setLoading(false))
+  }, [driverId])
+
+  if (loading) return <div className="p-6 text-center text-muted-foreground">Loading activity...</div>
+  if (error) return <div className="p-6 text-center text-red-600">{error}</div>
+  if (!activity.length) return <div className="p-6 text-center text-muted-foreground">No activity found.</div>
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-xl font-bold mb-2">Activity Timeline</h2>
+      <ol className="relative border-l-2 border-border ml-4">
+        {activity.map((event, i) => (
+          <li key={event.id} className="mb-8 ml-6">
+            <span className={
+              `absolute -left-4 flex items-center justify-center w-8 h-8 rounded-full ring-4 ring-background ${
+                event.type === 'alert' ? 'bg-orange-500 text-white' :
+                event.type === 'document' ? 'bg-blue-500 text-white' :
+                'bg-gray-400 text-white'
+              }`
+            }>
+              {event.type === 'alert' ? <AlertTriangle className="h-5 w-5" /> : null}
+              {event.type === 'document' ? <FileText className="h-5 w-5" /> : null}
+              {/* Add more icons for other event types if needed */}
+            </span>
+            <div className="flex flex-col gap-1">
+              <span className="font-semibold text-foreground">{event.description}</span>
+              <span className="text-xs text-muted-foreground">{new Date(event.timestamp).toLocaleString()}</span>
+              {/* Optionally, show more meta info */}
+              {event.type === 'alert' && (
+                <span className="text-xs text-orange-700">Status: {event.meta.status}, Priority: {event.meta.priority}</span>
+              )}
+              {event.type === 'document' && (
+                <span className="text-xs text-blue-700">File: {event.meta.fileName}, Status: {event.meta.status}</span>
+              )}
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  )
+}
+
+function DriverNotes({ driverId }: { driverId: string }) {
+  const [notes, setNotes] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [content, setContent] = useState('')
+  const [adding, setAdding] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const { toast } = useToast()
+  const { data: session } = useSession();
+  const author = session?.user?.name || 'Unknown'
+
+  const fetchNotes = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/drivers/${driverId}/notes`)
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to fetch notes')
+      setNotes(data.data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error')
+    } finally {
+      setLoading(false)
+    }
+  }
+  useEffect(() => { fetchNotes() }, [driverId])
+
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!content.trim()) return
+    setAdding(true)
+    try {
+      const res = await fetch(`/api/drivers/${driverId}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ author, content })
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        toast({ title: 'Add failed', description: data.error || 'Failed to add note', variant: 'destructive' })
+      } else {
+        toast({ title: 'Note added', description: 'Note added successfully.' })
+        setContent('')
+        fetchNotes()
+      }
+    } catch {
+      toast({ title: 'Add failed', description: 'Failed to add note', variant: 'destructive' })
+    } finally {
+      setAdding(false)
+    }
+  }
+  const handleDelete = async (noteId: string) => {
+    setDeletingId(noteId)
+    try {
+      const res = await fetch(`/api/drivers/${driverId}/notes/${noteId}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        toast({ title: 'Delete failed', description: data.error || 'Failed to delete note', variant: 'destructive' })
+      } else {
+        toast({ title: 'Note deleted', description: 'Note deleted successfully.' })
+        fetchNotes()
+      }
+    } catch {
+      toast({ title: 'Delete failed', description: 'Failed to delete note', variant: 'destructive' })
+    } finally {
+      setDeletingId(null)
+    }
+  }
+  return (
+    <div className="space-y-6">
+      <form onSubmit={handleAdd} className="flex flex-col md:flex-row gap-4 items-end bg-muted/30 p-4 rounded-xl border border-border">
+        <div className="flex-1 flex flex-col gap-1">
+          <label className="font-medium">Add Note</label>
+          <textarea
+            className="rounded-lg border border-border px-3 py-2 w-full bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-400 min-h-[60px]"
+            value={content}
+            onChange={e => setContent(e.target.value)}
+            placeholder="Write a note about this driver..."
+            disabled={adding}
+            maxLength={1000}
+            required
+          />
+        </div>
+        <Button type="submit" disabled={adding || !content.trim()}>{adding ? 'Adding...' : 'Add Note'}</Button>
+      </form>
+      <div className="overflow-x-auto rounded-2xl shadow-lg bg-card border border-border">
+        {loading ? (
+          <div className="p-6 text-center text-muted-foreground">Loading notes...</div>
+        ) : error ? (
+          <div className="p-6 text-center text-red-600">{error}</div>
+        ) : notes.length === 0 ? (
+          <div className="p-6 text-center text-muted-foreground">No notes found for this driver.</div>
+        ) : (
+          <table className="min-w-full divide-y divide-border">
+            <thead>
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">Author</th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">Note</th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">Date</th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {notes.map((note: any) => (
+                <tr key={note.id} className="hover:bg-muted/40 dark:hover:bg-muted/20 transition-all">
+                  <td className="px-6 py-4 whitespace-nowrap font-semibold">{note.author}</td>
+                  <td className="px-6 py-4 whitespace-pre-line">{note.content}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-xs text-muted-foreground">{new Date(note.createdAt).toLocaleString()}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <Button size="sm" variant="destructive" onClick={() => handleDelete(note.id)} disabled={deletingId === note.id}>{deletingId === note.id ? 'Deleting...' : 'Delete'}</Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   )
 } 

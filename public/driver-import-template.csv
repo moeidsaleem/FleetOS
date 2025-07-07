@@ -1,0 +1,3 @@
+name,email,phone,uberDriverId,status,language
+John Doe,john@example.com,+971501234567,uber_123,ACTIVE,ENGLISH
+Jane Smith,jane@example.com,+971501234568,uber_124,ACTIVE,ARABIC

@@ -14,7 +14,15 @@ export interface SyncResult {
 export class UberSyncService {
   
   // Main sync function to pull data from Uber and update local database
-  async syncDriversFromUber(): Promise<SyncResult> {
+  async syncDriversFromUber(syncType: 'AUTO' | 'MANUAL' = 'MANUAL', createdBy: string | null = null): Promise<SyncResult> {
+    const syncLog = await prisma.uberSyncLog.create({
+      data: {
+        startedAt: new Date(),
+        status: 'IN_PROGRESS',
+        type: syncType,
+        createdBy: createdBy || 'system',
+      }
+    })
     const result: SyncResult = {
       success: false,
       driversProcessed: 0,
@@ -22,7 +30,9 @@ export class UberSyncService {
       driversCreated: 0,
       errors: []
     }
-
+    let finishedAt = new Date()
+    let status = 'SUCCESS'
+    let errorMessage = null
     try {
       console.log('Starting Uber Fleet API sync (OAuth)...')
       const uberAPI = getUberAPI()
@@ -31,6 +41,8 @@ export class UberSyncService {
         const errorMsg = 'UBER_ORG_ID must be set in environment variables.'
         console.error(errorMsg)
         result.errors.push(errorMsg)
+        status = 'FAILURE'
+        errorMessage = errorMsg
         return result
       }
       // Get all drivers from Uber Fleet API (status overviews)
@@ -73,14 +85,32 @@ export class UberSyncService {
       console.log(`[SYNC] Sync completed: ${result.driversProcessed} processed, ${result.driversCreated} created, ${result.driversUpdated} updated`)
       if (result.errors.length > 0) {
         console.error('[SYNC] Errors:', result.errors)
+        status = 'PARTIAL'
+        errorMessage = result.errors.join('; ')
       }
+      finishedAt = new Date()
       return result
       
     } catch (error) {
       const errorMsg = `Sync failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       console.error('[SYNC] Fatal error:', errorMsg, error)
       result.errors.push(errorMsg)
+      status = 'FAILURE'
+      errorMessage = errorMsg
+      finishedAt = new Date()
       return result
+    } finally {
+      await prisma.uberSyncLog.update({
+        where: { id: syncLog.id },
+        data: {
+          finishedAt,
+          status,
+          driversProcessed: result.driversProcessed,
+          driversCreated: result.driversCreated,
+          driversUpdated: result.driversUpdated,
+          errorMessage,
+        }
+      })
     }
   }
 
@@ -263,6 +293,13 @@ export class UberSyncService {
       activeDrivers,
       driversWithMetrics,
     }
+  }
+
+  // Fetch the latest sync log
+  async getLatestSyncLog() {
+    return prisma.uberSyncLog.findFirst({
+      orderBy: { startedAt: 'desc' }
+    })
   }
 }
 

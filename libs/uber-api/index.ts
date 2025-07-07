@@ -186,6 +186,21 @@ export class UberFleetAPI {
     return response.data.driverStatusOverviews || []
   }
 
+  /**
+   * Get organization info (vehicle-suppliers/organizations)
+   */
+  async getOrganization(orgId?: string): Promise<{ id: string; name: string }> {
+    const client = await this.getClient()
+    const id = orgId || HARDCODED_UBER_ORG_ID
+    if (!id) throw new Error('UBER_ORG_ID must be set in env')
+    const response = await client.get(`/vehicle-suppliers/organizations/${id}`)
+    // Uber API returns org info with id and name
+    return {
+      id: response.data.id,
+      name: response.data.name || response.data.organizationName || 'Unknown'
+    }
+  }
+
   // --- Deprecated/legacy methods (do not use for new code) ---
 
   /**

@@ -4,6 +4,11 @@ import { DriverSchema } from '../../../types'
 import { z } from 'zod'
 import { DriverStatus, Prisma } from '@prisma/client'
 import { uberSyncService } from '../../../libs/uber-sync'
+import { parse } from 'json2csv'
+import formidable from 'formidable'
+import fs from 'fs/promises'
+import Papa from 'papaparse'
+import type { Fields, Files, File } from 'formidable'
 
 // GET /api/drivers - List all drivers
 export async function GET(request: NextRequest) {
@@ -20,7 +25,7 @@ export async function GET(request: NextRequest) {
     if (syncFromUber) {
       console.log('Syncing drivers from Uber Fleet API (OAuth)...')
       try {
-        syncResult = await uberSyncService.syncDriversFromUber()
+        syncResult = await uberSyncService.syncDriversFromUber('MANUAL', 'system')
       } catch (error) {
         console.error('Uber sync failed:', error)
         syncResult = { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
@@ -190,5 +195,73 @@ export async function POST(request: NextRequest) {
       error: 'Failed to create driver',
       timestamp: new Date()
     }, { status: 500 })
+  }
+}
+
+// GET /api/drivers/export - Export all drivers as CSV
+export async function GET_EXPORT(request: NextRequest) {
+  try {
+    const drivers = await prisma.driver.findMany({})
+    const fields = ['name', 'email', 'phone', 'uberDriverId', 'status', 'language']
+    const opts = { fields }
+    const csv = parse(drivers, opts)
+    return new Response(csv, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/csv',
+        'Content-Disposition': 'attachment; filename="drivers-export.csv"',
+      },
+    })
+  } catch (error) {
+    return NextResponse.json({ success: false, error: 'Failed to export drivers' }, { status: 500 })
+  }
+}
+
+// POST /api/drivers/import - Bulk import drivers from CSV
+export const config = { api: { bodyParser: false } }
+export async function POST_IMPORT(request: NextRequest) {
+  try {
+    // Parse multipart form
+    const form = formidable({ multiples: false })
+    const [fields, files] = await new Promise<[Fields, Files]>((resolve, reject) => {
+      form.parse(request as any, (err: any, fields: Fields, files: Files) => {
+        if (err) reject(err)
+        else resolve([fields, files])
+      })
+    })
+    let fileObj:any = files.file || files.csv
+    if (!fileObj) return NextResponse.json({ success: false, error: 'No file uploaded' }, { status: 400 })
+    if (Array.isArray(fileObj)) fileObj = fileObj[0]
+    if (!fileObj || Array.isArray(fileObj)) return NextResponse.json({ success: false, error: 'Invalid file upload' }, { status: 400 })
+    const file = fileObj as unknown as File
+    const csvContent = await fs.readFile(file.filepath, 'utf8')
+    const { data, errors } = Papa.parse(csvContent, { header: true, skipEmptyLines: true })
+    if (errors.length > 0) {
+      return NextResponse.json({ success: false, error: 'CSV parse error', details: errors }, { status: 400 })
+    }
+    // Validate and insert
+    const results = []
+    let successCount = 0
+    let errorCount = 0
+    for (const row of data) {
+      const { name, email, phone, uberDriverId, status, language } = row as any
+      if (!name || !email || !phone || !status || !language) {
+        results.push({ row, error: 'Missing required fields' }); errorCount++; continue
+      }
+      // Check for existing
+      const existing = await prisma.driver.findFirst({ where: { OR: [{ email }, { uberDriverId }] } })
+      if (existing) {
+        results.push({ row, error: 'Duplicate email or Uber ID' }); errorCount++; continue
+      }
+      try {
+        await prisma.driver.create({ data: { name, email, phone, uberDriverId, status, language } })
+        results.push({ row, success: true }); successCount++
+      } catch (err) {
+        results.push({ row, error: 'DB error' }); errorCount++
+      }
+    }
+    return NextResponse.json({ success: true, successCount, errorCount, results })
+  } catch (error) {
+    return NextResponse.json({ success: false, error: 'Failed to import drivers' }, { status: 500 })
   }
 } 

@@ -26,6 +26,8 @@ model Driver {
   // Relations
   metrics         DriverMetrics[]
   alerts          AlertRecord[]
+  driverDocuments DriverDocument[]
+  driverNotes     DriverNote[]
   
   @@map("drivers")
 }
@@ -108,16 +110,17 @@ model SystemConfig {
 }
 
 model UberSyncLog {
-  id          String      @id @default(uuid())
-  syncType    String      // 'drivers', 'trips', 'metrics'
-  status      SyncStatus
-  recordsProcessed Int    @default(0)
-  errors      Json?       // Store any errors as JSON
-  startedAt   DateTime
-  completedAt DateTime?
-  createdAt   DateTime    @default(now())
-
-  @@map("uber_sync_logs")
+  id           String   @id @default(uuid())
+  startedAt    DateTime @default(now())
+  finishedAt   DateTime?
+  status       String   // 'SUCCESS', 'FAILURE', 'PARTIAL', etc.
+  type         String   // 'AUTO', 'MANUAL', 'DRIVER', etc.
+  driversProcessed Int   @default(0)
+  driversCreated   Int   @default(0)
+  driversUpdated   Int   @default(0)
+  errorMessage  String? // Error details if any
+  createdBy     String? // User or system
+  createdAt     DateTime @default(now())
 }
 
 // AUTH: User model and Role enum
@@ -183,4 +186,49 @@ enum SyncStatus {
   RUNNING
   COMPLETED
   FAILED
+}
+
+// --- Driver Document Uploads ---
+model DriverDocument {
+  id          String      @id @default(uuid())
+  driverId    String
+  type        DocumentType
+  fileName    String
+  filePath    String
+  expiryDate  DateTime?
+  uploadedAt  DateTime    @default(now())
+  uploadedBy  String?
+  status      DocumentStatus @default(VALID)
+
+  // Relations
+  driver      Driver      @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@map("driver_documents")
+  @@index([driverId])
+}
+
+enum DocumentType {
+  LICENSE
+  EMIRATES_ID
+  VISA
+  INSURANCE
+  OTHER
+}
+
+enum DocumentStatus {
+  VALID
+  EXPIRED
+  EXPIRING_SOON
+}
+
+model DriverNote {
+  id        String   @id @default(uuid())
+  driverId  String
+  author    String
+  content   String
+  createdAt DateTime @default(now())
+
+  driver    Driver   @relation(fields: [driverId], references: [id])
+
+  @@index([driverId])
 } 

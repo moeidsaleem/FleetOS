@@ -302,4 +302,65 @@ export async function PATCH(
       timestamp: new Date()
     }, { status: 500 })
   }
+}
+
+// GET /api/drivers/[id]/activity - Unified activity feed for timeline
+export async function GET_ACTIVITY(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await context.params
+    // Fetch alerts
+    const alerts = await prisma.alertRecord.findMany({
+      where: { driverId: id },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        createdAt: true,
+        alertType: true,
+        reason: true,
+        status: true,
+        priority: true,
+        message: true,
+      }
+    })
+    // Fetch document uploads
+    const documents = await prisma.driverDocument.findMany({
+      where: { driverId: id },
+      orderBy: { uploadedAt: 'desc' },
+      select: {
+        id: true,
+        uploadedAt: true,
+        type: true,
+        fileName: true,
+        status: true,
+        expiryDate: true,
+      }
+    })
+    // Fetch status changes (from AlertRecord or add a StatusChange model in future)
+    // For now, infer from alerts with reason/status 'status change' or similar
+    // Optionally, add more sources (e.g., trip completions)
+    // Compose activity events
+    const activity = [
+      ...alerts.map(a => ({
+        type: 'alert',
+        id: a.id,
+        timestamp: a.createdAt,
+        description: `Alert: ${a.reason}`,
+        meta: a
+      })),
+      ...documents.map(d => ({
+        type: 'document',
+        id: d.id,
+        timestamp: d.uploadedAt,
+        description: `Document uploaded: ${d.type} (${d.fileName})`,
+        meta: d
+      })),
+      // Add more event types here as needed
+    ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    return NextResponse.json({ success: true, data: activity })
+  } catch (error) {
+    return NextResponse.json({ success: false, error: 'Failed to fetch activity feed' }, { status: 500 })
+  }
 } 
