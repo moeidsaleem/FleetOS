@@ -44,6 +44,7 @@ model DriverMetrics {
   idleRatio        Float
   calculatedScore  Float
   createdAt        DateTime @default(now())
+  analyticsMetrics Json?
 
   // Relations
   driver           Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)

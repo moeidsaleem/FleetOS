@@ -3,12 +3,15 @@ import { prisma } from '../../../libs/database'
 import { DriverSchema } from '../../../types'
 import { z } from 'zod'
 import { DriverStatus, Prisma } from '@prisma/client'
-import { uberSyncService } from '../../../libs/uber-sync'
+import { UberSyncService } from '../../../libs/uber-sync'
 import { parse } from 'json2csv'
 import formidable from 'formidable'
 import fs from 'fs/promises'
 import Papa from 'papaparse'
 import type { Fields, Files, File } from 'formidable'
+
+// Instantiate the UberSyncService
+const uberSyncService = new UberSyncService()
 
 // GET /api/drivers - List all drivers
 export async function GET(request: NextRequest) {
@@ -79,6 +82,8 @@ export async function GET(request: NextRequest) {
     const driversWithScores = drivers.map((driver) => ({
       ...driver,
       currentScore: driver.metrics[0]?.calculatedScore || 0,
+      analyticsMetrics: driver.metrics[0]?.analyticsMetrics || null,
+      analyticsScore: driver.metrics[0]?.calculatedScore || 0,
       recentAlertsCount: driver.alerts.length,
       lastMetricDate: driver.metrics[0]?.date || null,
       phoneNumber: driver.phone, // Map to expected field name

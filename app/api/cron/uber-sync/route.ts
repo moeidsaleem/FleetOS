@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { uberSyncService } from '../../../../libs/uber-sync'
+import { UberSyncService } from '../../../../libs/uber-sync'
 
 // Set this in your environment variables
 const CRON_SECRET = process.env.CRON_SECRET || 'changeme'
+
+// Instantiate the UberSyncService
+const uberSyncService = new UberSyncService()
 
 export async function POST(request: NextRequest) {
   // Accept token via header or query param

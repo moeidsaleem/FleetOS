@@ -58,6 +58,8 @@ export async function GET(
     const latestMetrics = driver.metrics[0]
     let currentScore = 0
     let scoreBreakdown = null
+    let analyticsMetrics = null
+    let analyticsScore = 0
     
     if (latestMetrics) {
       const performanceData = {
@@ -71,6 +73,8 @@ export async function GET(
       
       currentScore = calculateDriverScore(performanceData)
       scoreBreakdown = getScoreBreakdown(performanceData)
+      analyticsMetrics = latestMetrics.analyticsMetrics || null
+      analyticsScore = latestMetrics.calculatedScore || 0
     }
 
     // Calculate performance trends
@@ -108,6 +112,8 @@ export async function GET(
           currentScore,
           avgScore,
           scoreBreakdown,
+          analyticsMetrics,
+          analyticsScore,
           trend: performanceTrend,
           metricsCount: driver.metrics.length
         },

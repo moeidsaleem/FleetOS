@@ -262,6 +262,53 @@ export class UberFleetAPI {
 
     return allTrips
   }
+
+  async fetchDriverAnalytics(driverUuids: string[], start: number, end: number) {
+    const orgId = process.env.UBER_ORG_ID;
+    const accessToken = await getUberAccessToken();
+    const url = `${this.baseURL}/vehicle-suppliers/analytics-data/query`;
+
+    const body = {
+      reportRequests: [
+        {
+          timeRanges: [{ startsAt: start, endsAt: end }],
+          dimensions: [{ name: "vs:driver" }],
+          metrics: [
+            { expression: "vs:HoursOnline" },
+            { expression: "vs:HoursOnTrip" },
+            { expression: "vs:TotalTrips" },
+            { expression: "vs:TotalEarnings" }
+          ],
+          dimension_filter_clauses: [
+            {
+              operator: "FILTER_LOGICAL_OPERATOR_AND",
+              filters: [
+                {
+                  dimension_name: "vs:driver",
+                  operator: "OPERATOR_IN",
+                  expressions: driverUuids
+                }
+              ]
+            }
+          ],
+          pagination_options: { pageSize: 50 }
+        }
+      ],
+      orgId: { orgUuid: orgId }
+    };
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok) throw new Error(`Uber analytics fetch failed: ${res.statusText}`);
+    return res.json();
+  }
 }
 
 // Singleton instance

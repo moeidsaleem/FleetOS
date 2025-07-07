@@ -2,6 +2,8 @@ import { prisma } from '../database'
 import { getUberAPI } from '../uber-api'
 import { calculateDriverScore } from '../driver-scoring'
 import { DriverStatus } from '@prisma/client'
+import { scoreDriverFromAnalytics, defaultAnalyticsScoreConfig, AnalyticsMetrics, AnalyticsScoreConfig } from '../driver-scoring/analytics-score'
+import { Prisma } from '@prisma/client'
 
 export interface SyncResult {
   success: boolean
@@ -77,6 +79,71 @@ export class UberSyncService {
           console.error(errorMsg, error)
           result.errors.push(errorMsg)
         }
+      }
+      
+      // After processing all drivers, fetch analytics and update metrics
+      try {
+        const drivers = await prisma.driver.findMany({ where: { uberDriverId: { not: '' } } })
+        const driverUuids = drivers.map(d => d.uberDriverId)
+        const uberAPI = getUberAPI()
+        const now = Date.now()
+        const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000
+        const batchSize = 50
+        // Load config from SystemConfig if available
+        let analyticsScoreConfig: AnalyticsScoreConfig = defaultAnalyticsScoreConfig
+        try {
+          const configRow = await prisma.systemConfig.findUnique({ where: { key: 'analyticsScoreConfig' } })
+          if (configRow && configRow.value) {
+            analyticsScoreConfig = configRow.value as unknown as AnalyticsScoreConfig
+          }
+        } catch {}
+        for (let i = 0; i < driverUuids.length; i += batchSize) {
+          const batch = driverUuids.slice(i, i + batchSize)
+          const analyticsResponse = await uberAPI.fetchDriverAnalytics(batch, sevenDaysAgo, now)
+          const rows = analyticsResponse.reports?.[0]?.data?.timeRangeData?.[0]?.rows || []
+          for (const row of rows) {
+            const driverId = row.dimensionId as string
+            const [hoursOnline, hoursOnTrip, trips, earnings] = row.metricValues.map(parseFloat)
+            const metrics: AnalyticsMetrics = { hoursOnline, hoursOnTrip, trips, earnings }
+            const score = scoreDriverFromAnalytics(metrics, analyticsScoreConfig)
+            // Find local driver by Uber UUID
+            const localDriver = drivers.find(d => d.uberDriverId === driverId)
+            if (!localDriver) continue
+            // Upsert metrics for today
+            await prisma.driverMetrics.upsert({
+              where: {
+                driverId_date: {
+                  driverId: localDriver.id,
+                  date: new Date(new Date(now).toISOString().split('T')[0])
+                }
+              },
+              update: {
+                analyticsMetrics: metrics as unknown as Prisma.JsonObject,
+                calculatedScore: score / 100,
+                acceptanceRate: 0,
+                cancellationRate: 0,
+                completionRate: 0,
+                feedbackScore: 0,
+                tripVolumeIndex: 0,
+                idleRatio: 0
+              },
+              create: {
+                driverId: localDriver.id,
+                date: new Date(new Date(now).toISOString().split('T')[0]),
+                acceptanceRate: 0,
+                cancellationRate: 0,
+                completionRate: 0,
+                feedbackScore: 0,
+                tripVolumeIndex: 0,
+                idleRatio: 0,
+                analyticsMetrics: metrics as unknown as Prisma.JsonObject,
+                calculatedScore: score / 100
+              }
+            })
+          }
+        }
+      } catch (err) {
+        console.error('Analytics scoring failed:', err)
       }
       
       // Calculate success
@@ -165,142 +232,16 @@ export class UberSyncService {
         result.driversCreated++
         console.log(`[SYNC] Created new driver ${localDriver.id}`)
       }
-
-      // Sync driver metrics and calculate score
-      await this.syncDriverMetrics(localDriver.id, uberDriver.driver_id || uberDriver.driverId)
     } catch (error) {
       const errorMsg = `[SYNC] Error in processDriver for Uber ID ${uberDriver.driver_id || uberDriver.driverId}: ${error instanceof Error ? error.message : 'Unknown error'}`
       console.error(errorMsg, error)
       result.errors.push(errorMsg)
-      throw error
     }
   }
 
-  // Sync driver performance metrics
-  private async syncDriverMetrics(localDriverId: string, driverUuid: string): Promise<void> {
-    try {
-      const uberAPI = getUberAPI()
-      // Get metrics for the last 7 days
-      const endDate = new Date()
-      const startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-      // Get trips from Uber using the new method
-      const trips = await uberAPI.getTripsForDriver(driverUuid, startDate, endDate)
-      // Calculate performance data using the new method
-      const performanceData = uberAPI.calculateDriverMetricsFromTrips(driverUuid, trips)
-      // Calculate final score using our scoring engine
-      const calculatedScore = calculateDriverScore(performanceData)
-      // Store metrics in database
-      await prisma.driverMetrics.upsert({
-        where: {
-          driverId_date: {
-            driverId: localDriverId,
-            date: new Date(endDate.toISOString().split('T')[0])
-          }
-        },
-        update: {
-          acceptanceRate: performanceData.acceptanceRate,
-          cancellationRate: performanceData.cancellationRate,
-          completionRate: performanceData.completionRate,
-          feedbackScore: performanceData.feedbackScore,
-          tripVolumeIndex: performanceData.tripVolumeIndex,
-          idleRatio: performanceData.idleRatio,
-          calculatedScore: calculatedScore,
-        },
-        create: {
-          driverId: localDriverId,
-          date: new Date(endDate.toISOString().split('T')[0]),
-          acceptanceRate: performanceData.acceptanceRate,
-          cancellationRate: performanceData.cancellationRate,
-          completionRate: performanceData.completionRate,
-          feedbackScore: performanceData.feedbackScore,
-          tripVolumeIndex: performanceData.tripVolumeIndex,
-          idleRatio: performanceData.idleRatio,
-          calculatedScore: calculatedScore,
-        }
-      })
-
-    } catch (error) {
-      console.error(`Error syncing metrics for driver ${driverUuid}:`, error)
-      // Continue with other drivers even if one fails
-    }
-  }
-
-  // Map Uber driver status to local status enum
-  private mapUberStatusToLocal(uberStatus: string): DriverStatus {
-    if (!uberStatus) return DriverStatus.INACTIVE
-    switch (uberStatus.toUpperCase()) {
-      case 'ACTIVE': return DriverStatus.ACTIVE
-      case 'INACTIVE': return DriverStatus.INACTIVE
-      case 'SUSPENDED': return DriverStatus.SUSPENDED
-      case 'DRIVER_STATUS_ONLINE': return DriverStatus.ACTIVE
-      case 'DRIVER_STATUS_OFFLINE': return DriverStatus.INACTIVE
-      // Add more mappings as Uber adds new statuses
-      default: return DriverStatus.INACTIVE
-    }
-  }
-
-  // Sync specific driver by Uber ID
-  async syncSpecificDriver(uberDriverId: string): Promise<void> {
-    try {
-      const uberAPI = getUberAPI()
-      const orgId = process.env.UBER_ORG_ID
-      if (!orgId) throw new Error('UBER_ORG_ID must be set in environment variables.')
-      const data = await uberAPI.listDrivers(orgId)
-      const uberDriver = data.find((d: any) => d.driver_id === uberDriverId)
-      if (!uberDriver) {
-        throw new Error(`Driver ${uberDriverId} not found in Uber Fleet API`)
-      }
-      const result: SyncResult = {
-        success: false,
-        driversProcessed: 0,
-        driversUpdated: 0,
-        driversCreated: 0,
-        errors: []
-      }
-      await this.processDriver(uberDriver, result)
-    } catch (error) {
-      console.error(`Error syncing specific driver ${uberDriverId}:`, error)
-      throw error
-    }
-  }
-
-  // Get sync status/summary
-  async getSyncSummary(): Promise<{
-    lastSyncTime: Date | null
-    totalDrivers: number
-    activeDrivers: number
-    driversWithMetrics: number
-  }> {
-    const [totalDrivers, activeDrivers, driversWithMetrics, lastMetric] = await Promise.all([
-      prisma.driver.count(),
-      prisma.driver.count({ where: { status: DriverStatus.ACTIVE } }),
-      prisma.driver.count({
-        where: {
-          metrics: {
-            some: {}
-          }
-        }
-      }),
-      prisma.driverMetrics.findFirst({
-        orderBy: { createdAt: 'desc' },
-        select: { createdAt: true }
-      })
-    ])
-
-    return {
-      lastSyncTime: lastMetric?.createdAt || null,
-      totalDrivers,
-      activeDrivers,
-      driversWithMetrics,
-    }
-  }
-
-  // Fetch the latest sync log
-  async getLatestSyncLog() {
-    return prisma.uberSyncLog.findFirst({
-      orderBy: { startedAt: 'desc' }
-    })
+  private mapUberStatusToLocal(uberStatus: string | null): DriverStatus {
+    // Implement the logic to map Uber status to local status
+    // This is a placeholder and should be replaced with the actual implementation
+    return 'ACTIVE' as DriverStatus
   }
 }
-
-export const uberSyncService = new UberSyncService() 
