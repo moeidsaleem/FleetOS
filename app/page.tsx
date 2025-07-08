@@ -8,6 +8,7 @@ import { Star, Sun, Moon } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { useTheme, ThemeProvider } from '@/components/ui/theme-provider'
 import Head from 'next/head'
+import { FleetOSAnimatedBeams } from '@/components/magicui/fleetos-animated-beams'
 
 // Simple scroll animation hook
 function useScrollReveal(ref: React.RefObject<HTMLElement>, options = { threshold: 0.1 }) {
@@ -200,7 +201,13 @@ export default function HomePage() {
       <div aria-hidden="true" className="fixed top-0 left-0 w-full h-1 z-[100] bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600" style={{ width: `${scrollProgress}%`, transition: 'width 0.2s', position: 'fixed' }} />
       <div className="min-h-screen bg-white dark:bg-black flex flex-col transition-colors duration-300">
         <MainNav />
+
         <HeroSection />
+        <div className="relative z-10"> 
+
+          <FleetOSAnimatedBeams />
+        </div>
+
         {/* Feature Grid Section */}
         <section id="features" className="relative py-12 md:py-20 bg-white dark:bg-black overflow-hidden border-b border-gray-100 dark:border-gray-800 transition-colors duration-300">
           <div className="container mx-auto px-4 md:px-6 max-w-7xl relative z-10" data-reveal>
@@ -233,6 +240,7 @@ export default function HomePage() {
             </div>
           </div>
         </section>
+  
         {/* How It Works Section */}
         <section id="how-it-works" className="py-12 md:py-20 bg-gray-50 dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 transition-colors duration-300">
           <div className="container mx-auto px-4 md:px-6 max-w-7xl" data-reveal>

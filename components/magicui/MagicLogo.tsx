@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 
-export default function MagicLogo({ size = 40 }: { size?: number }) {
+export default function MagicLogo({ size = 40, className }: { size?: number, className?: string }) {
   return (
     <motion.svg
       width={size}
@@ -11,6 +11,7 @@ export default function MagicLogo({ size = 40 }: { size?: number }) {
       initial={{ rotate: -10, scale: 0.9 }}
       animate={{ rotate: 0, scale: 1 }}
       transition={{ duration: 0.8, ease: "easeOut" }}
+      className={className}
     >
       <defs>
         <linearGradient id="magic-gradient" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
