@@ -24,9 +24,10 @@ import {
   Zap,
   Users,
   FileText,
-  RefreshCw
+  RefreshCw,
+  Send
 } from 'lucide-react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts'
 import { RequireAuth } from '../../../../components/auth/require-auth'
 import React from 'react'
 import { DashboardLayout } from '../../../../components/layout/dashboard-layout'
@@ -39,6 +40,8 @@ import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input'
 import 'react-phone-number-input/style.css'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../../components/ui/table'
 import { useSession } from 'next-auth/react'
+import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from '../../../../components/ui/tooltip'
+import { formatDistanceToNow } from 'date-fns'
 
 interface DriverDetail {
   driver: {
@@ -70,6 +73,16 @@ interface DriverDetail {
       feedback: number
     }>
     metricsCount: number
+    analyticsTrend: Array<{
+      date: string
+      analyticsMetrics?: {
+        hoursOnline?: number
+        hoursOnTrip?: number
+        trips?: number
+        earnings?: number
+      }
+      analyticsScore?: number
+    }>
   }
   alerts: {
     recent: Array<{
@@ -80,6 +93,8 @@ interface DriverDetail {
       status: string
       sentAt: string
       createdAt: string
+      triggeredBy?: string
+      error?: string
     }>
     totalCount: number
   }
@@ -503,9 +518,10 @@ function DriverDetailPage(props: React.ComponentPropsWithoutRef<'div'>) {
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics Trend</TabsTrigger>
           <TabsTrigger value="alerts">Alerts</TabsTrigger>
           <TabsTrigger value="contact">Contact Info</TabsTrigger>
-          {driver.uber && <TabsTrigger value="uber">Uber Data</TabsTrigger>}
+          <TabsTrigger value="uber">Uber Data</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
           <TabsTrigger value="notes">Notes</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
@@ -529,7 +545,7 @@ function DriverDetailPage(props: React.ComponentPropsWithoutRef<'div'>) {
                         tickFormatter={(value) => new Date(value).toLocaleDateString()}
                       />
                       <YAxis domain={[0, 1]} tickFormatter={(value) => `${Math.round(value * 100)}%`} />
-                      <Tooltip 
+                      <RechartsTooltip 
                         labelFormatter={(value) => new Date(value).toLocaleDateString()}
                         formatter={(value: number) => [`${Math.round(value * 100)}%`, 'Score']}
                       />
@@ -618,6 +634,49 @@ function DriverDetailPage(props: React.ComponentPropsWithoutRef<'div'>) {
           </div>
         </TabsContent>
 
+        <TabsContent value="analytics" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Analytics Trend (Last 30 Days)</CardTitle>
+              <CardDescription>Uber analytics-based metrics and score</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {driver.performance.analyticsTrend && driver.performance.analyticsTrend.length > 0 ? (
+                <ResponsiveContainer width="100%" height={350}>
+                  <LineChart data={driver.performance.analyticsTrend.map((d: any) => ({
+                    date: d.date,
+                    hoursOnline: d.analyticsMetrics?.hoursOnline ?? null,
+                    hoursOnTrip: d.analyticsMetrics?.hoursOnTrip ?? null,
+                    trips: d.analyticsMetrics?.trips ?? null,
+                    earnings: d.analyticsMetrics?.earnings ?? null,
+                    analyticsScore: d.analyticsScore ?? null
+                  }))}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" tickFormatter={v => new Date(v).toLocaleDateString()} />
+                    <YAxis yAxisId="left" orientation="left" label={{ value: 'Hours/Trips', angle: -90, position: 'insideLeft' }} />
+                    <YAxis yAxisId="right" orientation="right" label={{ value: 'Score (%)', angle: 90, position: 'insideRight' }} domain={[0, 1]} tickFormatter={v => `${Math.round(v * 100)}%`} />
+                    <RechartsTooltip formatter={(value: any, name: string) => {
+                      if (name === 'analyticsScore') return [`${Math.round(value * 100)}%`, 'Score']
+                      if (name === 'earnings') return [`${Math.round(value)} AED`, 'Earnings']
+                      return [value, name]
+                    }} labelFormatter={v => new Date(v).toLocaleDateString()} />
+                    <Legend />
+                    <Line yAxisId="left" type="monotone" dataKey="hoursOnline" stroke="#6366f1" name="Hours Online" dot={false} />
+                    <Line yAxisId="left" type="monotone" dataKey="hoursOnTrip" stroke="#06b6d4" name="Hours On Trip" dot={false} />
+                    <Line yAxisId="left" type="monotone" dataKey="trips" stroke="#f59e42" name="Trips" dot={false} />
+                    <Line yAxisId="left" type="monotone" dataKey="earnings" stroke="#22c55e" name="Earnings" dot={false} />
+                    <Line yAxisId="right" type="monotone" dataKey="analyticsScore" stroke="#ef4444" name="Analytics Score" dot={{ fill: '#ef4444' }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                  No analytics data available
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="alerts" className="space-y-4">
           <Card>
             <CardHeader>
@@ -626,24 +685,84 @@ function DriverDetailPage(props: React.ComponentPropsWithoutRef<'div'>) {
             </CardHeader>
             <CardContent>
               {driver.alerts.recent.length > 0 ? (
-                <div className="space-y-4">
-                  {driver.alerts.recent.map((alert) => (
-                    <div key={alert.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-3 h-3 rounded-full ${getPriorityColor(alert.priority)}`}></div>
-                        <div>
-                          <p className="font-medium">{alert.reason}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {new Date(alert.createdAt).toLocaleDateString()} • {alert.type}
-                          </p>
-                        </div>
-                      </div>
-                      <Badge variant={alert.status === 'SENT' ? 'default' : 'secondary'}>
-                        {alert.status}
-                      </Badge>
-                    </div>
-                  ))}
+                <TooltipProvider>
+                <div className="overflow-x-auto rounded-2xl border border-border">
+                  <table className="min-w-full divide-y divide-border">
+                    <thead>
+                      <tr>
+                        <th className="px-4 py-2 text-left text-xs font-bold">Type</th>
+                        <th className="px-4 py-2 text-left text-xs font-bold">Channel</th>
+                        <th className="px-4 py-2 text-left text-xs font-bold">Reason</th>
+                        <th className="px-4 py-2 text-left text-xs font-bold">Status</th>
+                        <th className="px-4 py-2 text-left text-xs font-bold">Created</th>
+                        <th className="px-4 py-2 text-left text-xs font-bold">Triggered By</th>
+                        <th className="px-4 py-2 text-left text-xs font-bold">Error</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {driver.alerts.recent.map((alert) => {
+                        // Channel badge/icon logic
+                        let channelIcon = null, channelColor = 'bg-gray-200 text-gray-800'
+                        const channelLabel = alert.type
+                        if (channelLabel === 'WHATSAPP') { channelIcon = <MessageSquare className="h-4 w-4 text-green-600" />; channelColor = 'bg-green-100 text-green-800' }
+                        else if (channelLabel === 'TELEGRAM') { channelIcon = <Send className="h-4 w-4 text-sky-600" />; channelColor = 'bg-sky-100 text-sky-800' }
+                        else if (channelLabel === 'CALL') { channelIcon = <Phone className="h-4 w-4 text-blue-600" />; channelColor = 'bg-blue-100 text-blue-800' }
+                        else if (channelLabel === 'EMAIL') { channelIcon = <Mail className="h-4 w-4 text-purple-600" />; channelColor = 'bg-purple-100 text-purple-800' }
+                        // Status badge
+                        const statusVariant = alert.status === 'SENT' ? 'default' : alert.status === 'FAILED' ? 'destructive' : 'secondary'
+                        // Relative time
+                        const createdDate = new Date(alert.createdAt)
+                        const relativeTime = formatDistanceToNow(createdDate, { addSuffix: true })
+                        return (
+                          <tr key={alert.id} className="hover:bg-muted/40 transition-all">
+                            <td className="px-4 py-2">{alert.type}</td>
+                            <td className="px-4 py-2">
+                              <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold ${channelColor}`}
+                                aria-label={`Channel ${channelLabel}`}
+                                tabIndex={0}
+                              >
+                                {channelIcon} {channelLabel}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="truncate max-w-[120px] inline-block align-bottom" tabIndex={0}>{alert.reason}</span>
+                                </TooltipTrigger>
+                                <TooltipContent>{alert.reason}</TooltipContent>
+                              </Tooltip>
+                            </td>
+                            <td className="px-4 py-2">
+                              <Badge variant={statusVariant}>{alert.status}</Badge>
+                            </td>
+                            <td className="px-4 py-2 text-xs">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span tabIndex={0}>{relativeTime}</span>
+                                </TooltipTrigger>
+                                <TooltipContent>{createdDate.toLocaleString()}</TooltipContent>
+                              </Tooltip>
+                            </td>
+                            <td className="px-4 py-2">
+                              <Badge variant={alert.triggeredBy === 'AUTO' ? 'secondary' : 'default'}>{alert.triggeredBy}</Badge>
+                            </td>
+                            <td className="px-4 py-2">
+                              {alert.status === 'FAILED' && alert.error ? (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="text-red-600 text-xs truncate max-w-[100px] inline-block align-bottom" tabIndex={0}>{alert.error}</span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>{alert.error}</TooltipContent>
+                                </Tooltip>
+                              ) : null}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
                 </div>
+                </TooltipProvider>
               ) : (
                 <div className="flex items-center justify-center h-[200px] text-muted-foreground">
                   No alerts found for this driver

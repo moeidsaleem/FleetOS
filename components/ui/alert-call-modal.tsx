@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogFooter } from './dialog'
 import { Button } from './button'
 import { Label } from './label'
@@ -53,6 +53,13 @@ const SUPPORTED_LANGUAGES = [
   { code: 'ur', name: 'اردو (Urdu)', flag: '🇵🇰' }
 ]
 
+const TONE_OPTIONS = [
+  { value: 'friendly', label: 'Friendly' },
+  { value: 'firm', label: 'Firm' },
+  { value: 'urgent', label: 'Urgent' },
+  { value: 'neutral', label: 'Neutral' }
+]
+
 export function AlertCallModal({ open, onOpenChange, driver }: AlertCallModalProps) {
   const [loading, setLoading] = useState(false)
   const [selectedReason, setSelectedReason] = useState('')
@@ -60,7 +67,24 @@ export function AlertCallModal({ open, onOpenChange, driver }: AlertCallModalPro
   const [selectedLanguage, setSelectedLanguage] = useState(driver.language || 'en')
   const [tab, setTab] = useState<'call' | 'whatsapp' | 'telegram'>('call')
   const [message, setMessage] = useState('')
+  const [lastResult, setLastResult] = useState<any>(null)
+  const [selectedTone, setSelectedTone] = useState('friendly')
+  const [preview, setPreview] = useState<string | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [alertHistory, setAlertHistory] = useState<any[]>([])
   const { toast } = useToast()
+
+  useEffect(() => {
+    setLastResult(null)
+    setPreview(null)
+    // Fetch alert/call history when modal opens
+    if (open && driver.id) {
+      fetch(`/api/drivers/${driver.id}/alert-history?limit=3`).then(res => res.json()).then(data => {
+        if (data.success && Array.isArray(data.history)) setAlertHistory(data.history)
+        else setAlertHistory([])
+      }).catch(() => setAlertHistory([]))
+    }
+  }, [open, tab, driver.id])
 
   const selectedReasonData = PREDEFINED_REASONS.find(r => r.value === selectedReason)
 
@@ -79,12 +103,31 @@ export function AlertCallModal({ open, onOpenChange, driver }: AlertCallModalPro
       return
     }
     setLoading(true)
-    setTimeout(() => {
-      toast({ title: `Message sent via ${channel.charAt(0).toUpperCase() + channel.slice(1)}`, description: `Message sent to ${driver.name}.`, variant: 'default' })
+    setLastResult(null)
+    try {
+      const res = await fetch('/api/drivers/alert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          driverId: driver.id,
+          channel,
+          message,
+        })
+      })
+      const data = await res.json()
+      setLastResult(data.data)
+      if (res.ok && data.success) {
+        toast({ title: `Alert sent via ${channel.charAt(0).toUpperCase() + channel.slice(1)}`, description: `Status: ${data.data.status}`, variant: 'default' })
+        setMessage('')
+        onOpenChange(false)
+      } else {
+        toast({ title: `Failed to send ${channel} alert`, description: data.error || 'Unknown error', variant: 'destructive' })
+      }
+    } catch (err) {
+      toast({ title: 'Failed to send alert', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' })
+    } finally {
       setLoading(false)
-      setMessage('')
-      onOpenChange(false)
-    }, 1200)
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -98,18 +141,36 @@ export function AlertCallModal({ open, onOpenChange, driver }: AlertCallModalPro
       return
     }
     setLoading(true)
+    setLastResult(null)
     try {
-      setTimeout(() => {
-        toast({ title: 'Alert Call Initiated! 📞', description: `AI is now calling ${driver.name}.`, variant: 'default' })
-        setLoading(false)
+      const res = await fetch('/api/drivers/alert-call', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          driverId: driver.id,
+          reason: selectedReasonData?.label || customMessage || 'Manual alert',
+          message: selectedReason === 'custom' ? customMessage : (selectedReasonData?.description || ''),
+          driverName: driver.name,
+          phoneNumber: driver.phoneNumber,
+          currentScore: driver.currentScore || 0,
+          language: selectedLanguage,
+        })
+      })
+      const data = await res.json()
+      setLastResult(data.data?.alertRecord || data.data)
+      if (res.ok && data.success) {
+        toast({ title: 'Alert Call Initiated! 📞', description: `Status: ${data.data?.alertRecord?.status || 'SENT'}`, variant: 'default' })
         setSelectedReason('')
         setCustomMessage('')
         setSelectedLanguage(driver.language || 'en')
         onOpenChange(false)
-      }, 1200)
+      } else {
+        toast({ title: 'Failed to initiate call', description: data.error || 'Unknown error', variant: 'destructive' })
+      }
     } catch (error) {
+      toast({ title: 'Failed to initiate call', description: error instanceof Error ? error.message : 'Unknown error', variant: 'destructive' })
+    } finally {
       setLoading(false)
-      toast({ title: 'Failed to Initiate Call', description: 'An error occurred.', variant: 'destructive' })
     }
   }
 
@@ -123,6 +184,33 @@ export function AlertCallModal({ open, onOpenChange, driver }: AlertCallModalPro
       aiText = 'Please address the following issue.'
     }
     setMessage(aiText)
+  }
+
+  const handlePreview = async () => {
+    setPreviewLoading(true)
+    setPreview(null)
+    try {
+      const res = await fetch('/api/drivers/alert-call/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          driverId: driver.id,
+          reason: selectedReasonData?.label || customMessage || 'Manual alert',
+          message: selectedReason === 'custom' ? customMessage : (selectedReasonData?.description || ''),
+          driverName: driver.name,
+          currentScore: driver.currentScore || 0,
+          language: selectedLanguage,
+          tone: selectedTone
+        })
+      })
+      const data = await res.json()
+      if (res.ok && data.success) setPreview(data.preview)
+      else setPreview('Could not generate preview.')
+    } catch {
+      setPreview('Could not generate preview.')
+    } finally {
+      setPreviewLoading(false)
+    }
   }
 
   return (
@@ -176,6 +264,41 @@ export function AlertCallModal({ open, onOpenChange, driver }: AlertCallModalPro
                 </p>
               </div>
             )}
+            {/* Tone selection */}
+            <Label htmlFor="tone" className="text-sm font-medium" aria-label="Tone">
+              Tone <span className="text-red-500">*</span>
+            </Label>
+            <Select value={selectedTone} onValueChange={setSelectedTone} aria-label="Select tone">
+              <SelectTrigger>
+                <SelectValue placeholder="Select a tone..." />
+              </SelectTrigger>
+              <SelectContent>
+                {TONE_OPTIONS.map((tone) => (
+                  <SelectItem key={tone.value} value={tone.value}>{tone.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {/* Preview button */}
+            <div className="mt-2 flex items-center gap-2">
+              <Button type="button" onClick={handlePreview} disabled={previewLoading || !selectedReason || (selectedReason === 'custom' && !customMessage.trim())} aria-label="Preview Message">
+                {previewLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Preview Message'}
+              </Button>
+              {preview && (
+                <div className="ml-2 p-2 bg-gray-100 rounded border text-xs max-w-xs overflow-auto" aria-live="polite">{preview}</div>
+              )}
+            </div>
+          </div>
+          {/* Driver alert/call history */}
+          <div className="px-6 pt-2 pb-0">
+            <Label className="text-xs font-semibold" aria-label="Recent Alerts/Calls">Recent Alerts/Calls</Label>
+            <ul className="text-xs text-muted-foreground space-y-1 max-h-24 overflow-y-auto" aria-live="polite">
+              {alertHistory.length === 0 && <li>No recent alerts or calls.</li>}
+              {alertHistory.map((alert, idx) => (
+                <li key={alert.id || idx}>
+                  <span className="font-medium">{alert.reason}</span> — {alert.status} ({alert.createdAt ? new Date(alert.createdAt).toLocaleString() : ''})
+                </li>
+              ))}
+            </ul>
           </div>
           <div className="flex justify-center gap-2 bg-gradient-to-r from-blue-50 via-white to-purple-50 py-4 border-b mt-6">
             <button
@@ -304,6 +427,13 @@ export function AlertCallModal({ open, onOpenChange, driver }: AlertCallModalPro
                   </Button>
                 </DialogFooter>
               </form>
+            )}
+            {lastResult && (
+              <div className="mt-2 p-2 rounded bg-gray-100 border text-xs">
+                <div>Status: <b>{lastResult.status}</b></div>
+                {lastResult.triggeredBy && <div>Triggered By: <b>{lastResult.triggeredBy}</b></div>}
+                {lastResult.error && <div className="text-red-600">Error: {lastResult.error}</div>}
+              </div>
             )}
           </div>
         </div>

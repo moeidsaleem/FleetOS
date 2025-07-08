@@ -62,14 +62,12 @@ export function TopNav(props: { darkMode?: boolean, setDarkMode?: (v: boolean) =
       {/* Actions and User */}
       <div className="flex items-center gap-3">
         {/* Quick Add Driver */}
-        <Link href="/dashboard/drivers/add" passHref legacyBehavior>
-          <Button asChild variant="outline" size="sm" className="text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg shadow-sm transition-all font-semibold">
-            <a>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Driver
-            </a>
-          </Button>
-        </Link>
+        <Button asChild variant="outline" size="sm" className="text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg shadow-sm transition-all font-semibold">
+          <Link href="/dashboard/drivers/add">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Driver
+          </Link>
+        </Button>
         {/* Refresh Button */}
         <Button variant="ghost" size="sm" className="hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-all">
           <RefreshCw className="h-4 w-4 text-blue-600 dark:text-blue-400" />

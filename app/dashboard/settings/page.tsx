@@ -8,6 +8,11 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { AlertCircle, RefreshCw } from 'lucide-react'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Eye, EyeOff } from 'lucide-react';
 
 const TEMPLATE_TYPES = ['whatsapp', 'telegram', 'email', 'voice'] as const;
 
@@ -16,6 +21,19 @@ type TemplateType = typeof TEMPLATE_TYPES[number];
 type NotificationTemplates = {
   [key in TemplateType]?: string;
 };
+
+const ALERTING_REASONS = [
+  { value: 'low_analytics_score', label: 'Low Analytics Score' },
+  { value: 'idle', label: 'Idle Too Long' },
+  { value: 'low_trip_count', label: 'Low Trip Count' },
+  // Add more as needed
+]
+const ALERTING_CHANNELS = [
+  { value: 'whatsapp', label: 'WhatsApp' },
+  { value: 'telegram', label: 'Telegram' },
+  { value: 'call', label: 'Voice Call' },
+  { value: 'email', label: 'Email' },
+]
 
 function NotificationTemplatesSection() {
   const [templates, setTemplates] = useState<NotificationTemplates>({});
@@ -818,6 +836,221 @@ function UberSyncSection() {
   )
 }
 
+function AlertingControlsSection() {
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+  const [hours, setHours] = useState<{ start: number; end: number }>({ start: 9, end: 18 })
+  const [reasons, setReasons] = useState<string[]>(['low_analytics_score'])
+  const [channels, setChannels] = useState<string[]>(['whatsapp'])
+  const [cooldown, setCooldown] = useState<number>(24)
+
+  useEffect(() => {
+    setLoading(true)
+    setError(null)
+    Promise.all([
+      fetch('/api/settings?key=alertingHours').then(r => r.json()),
+      fetch('/api/settings?key=alertingReasons').then(r => r.json()),
+      fetch('/api/settings?key=alertingChannels').then(r => r.json()),
+      fetch('/api/settings?key=alertingCooldownHours').then(r => r.json()),
+    ]).then(([h, r, c, cd]) => {
+      if (h.success && h.data) setHours(h.data)
+      if (r.success && Array.isArray(r.data)) setReasons(r.data)
+      if (c.success && Array.isArray(c.data)) setChannels(c.data)
+      if (cd.success && typeof cd.data === 'number') setCooldown(cd.data)
+    }).catch(e => setError('Failed to load alerting config')).finally(() => setLoading(false))
+  }, [])
+
+  const handleSave = async () => {
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      await Promise.all([
+        fetch('/api/settings?key=alertingHours', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(hours) }),
+        fetch('/api/settings?key=alertingReasons', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(reasons) }),
+        fetch('/api/settings?key=alertingChannels', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(channels) }),
+        fetch('/api/settings?key=alertingCooldownHours', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cooldown) }),
+      ])
+      setSuccess('Alerting config saved!')
+    } catch (e) {
+      setError('Failed to save alerting config')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Card className="mb-8">
+      <CardHeader>
+        <CardTitle>Alerting Controls</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {error && <Alert variant="destructive"><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
+        {success && <Alert variant="default"><AlertTitle>Success</AlertTitle><AlertDescription>{success}</AlertDescription></Alert>}
+        <div className="flex flex-col md:flex-row gap-6">
+          <div className="flex-1">
+            <label className="font-medium flex items-center gap-2">Alerting Hours
+              <TooltipProvider><Tooltip><TooltipTrigger><span className="text-xs text-muted-foreground">?</span></TooltipTrigger><TooltipContent>Only send alerts between these hours (24h format).</TooltipContent></Tooltip></TooltipProvider>
+            </label>
+            <div className="flex gap-2 items-center mt-2">
+              <Input type="number" min={0} max={23} value={hours.start} onChange={e => setHours(h => ({ ...h, start: Number(e.target.value) }))} className="w-20" disabled={loading} />
+              <span>-</span>
+              <Input type="number" min={0} max={23} value={hours.end} onChange={e => setHours(h => ({ ...h, end: Number(e.target.value) }))} className="w-20" disabled={loading} />
+            </div>
+          </div>
+          <div className="flex-1">
+            <label className="font-medium flex items-center gap-2">Alert Reasons
+              <TooltipProvider><Tooltip><TooltipTrigger><span className="text-xs text-muted-foreground">?</span></TooltipTrigger><TooltipContent>Choose which reasons will trigger alerts.</TooltipContent></Tooltip></TooltipProvider>
+            </label>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {ALERTING_REASONS.map(r => (
+                <Badge key={r.value} variant={reasons.includes(r.value) ? 'default' : 'secondary'}
+                  onClick={() => setReasons(rs => rs.includes(r.value) ? rs.filter(x => x !== r.value) : [...rs, r.value])}
+                  className="cursor-pointer select-none">
+                  {r.label}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-col md:flex-row gap-6">
+          <div className="flex-1">
+            <label className="font-medium flex items-center gap-2">Alert Channels
+              <TooltipProvider><Tooltip><TooltipTrigger><span className="text-xs text-muted-foreground">?</span></TooltipTrigger><TooltipContent>Choose which channels to use for alerts.</TooltipContent></Tooltip></TooltipProvider>
+            </label>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {ALERTING_CHANNELS.map(c => (
+                <Badge key={c.value} variant={channels.includes(c.value) ? 'default' : 'secondary'}
+                  onClick={() => setChannels(cs => cs.includes(c.value) ? cs.filter(x => x !== c.value) : [...cs, c.value])}
+                  className="cursor-pointer select-none">
+                  {c.label}
+                </Badge>
+              ))}
+            </div>
+          </div>
+          <div className="flex-1">
+            <label className="font-medium flex items-center gap-2">Alert Cooldown (hours)
+              <TooltipProvider><Tooltip><TooltipTrigger><span className="text-xs text-muted-foreground">?</span></TooltipTrigger><TooltipContent>Minimum hours between alerts for the same driver/reason.</TooltipContent></Tooltip></TooltipProvider>
+            </label>
+            <Input type="number" min={1} max={168} value={cooldown} onChange={e => setCooldown(Number(e.target.value))} className="w-32 mt-2" disabled={loading} />
+          </div>
+        </div>
+        <Button onClick={handleSave} disabled={loading || saving}>{saving ? 'Saving...' : 'Save Alerting Config'}</Button>
+      </CardContent>
+    </Card>
+  )
+}
+
+function WhatsAppProviderSection() {
+  const [config, setConfig] = useState({
+    provider: 'twilio',
+    accountSid: '',
+    authToken: '',
+    whatsappNumber: '',
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [showToken, setShowToken] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    setLoading(true);
+    fetch('/api/settings?key=whatsapp')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.data) setConfig(data.data);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setConfig(c => ({ ...c, [e.target.name]: e.target.value }));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    const res = await fetch('/api/settings?key=whatsapp', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config),
+    });
+    const data = await res.json();
+    setSaving(false);
+    if (data.success) {
+      toast({ title: 'WhatsApp provider config saved', variant: 'default' });
+    } else {
+      toast({ title: 'Failed to save', description: data.error, variant: 'destructive' });
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold">WhatsApp Provider</h2>
+      <form className="space-y-4" onSubmit={e => { e.preventDefault(); handleSave(); }}>
+        <div>
+          <label className="block font-medium mb-1 text-gray-900 dark:text-gray-100" htmlFor="provider">Provider</label>
+          <select
+            id="provider"
+            name="provider"
+            value={config.provider}
+            onChange={handleChange}
+            disabled={true} // Only Twilio for now
+            className="w-full rounded-xl h-10 pl-4 bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-600 shadow-inner text-gray-900 dark:text-gray-100 font-semibold text-base md:text-sm focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500 transition-all outline-none"
+          >
+            <option value="twilio">Twilio</option>
+          </select>
+        </div>
+        <div>
+          <label className="block font-medium mb-1" htmlFor="accountSid">Twilio Account SID</label>
+          <Input
+            id="accountSid"
+            name="accountSid"
+            value={config.accountSid || ''}
+            onChange={handleChange}
+            placeholder="Enter Twilio Account SID"
+            disabled={loading}
+            className="bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-600 shadow-inner dark:text-gray-100"
+          />
+        </div>
+        <div>
+          <label className="block font-medium mb-1" htmlFor="authToken">Twilio Auth Token</label>
+          <div className="flex gap-2 items-center">
+            <Input
+              id="authToken"
+              name="authToken"
+              type={showToken ? 'text' : 'password'}
+              value={config.authToken || ''}
+              onChange={handleChange}
+              placeholder="Enter Twilio Auth Token"
+              disabled={loading}
+            />
+            <Button type="button" variant="outline" size="sm" onClick={() => setShowToken(s => !s)}>
+              {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </Button>
+          </div>
+        </div>
+        <div>
+          <label className="block font-medium mb-1" htmlFor="whatsappNumber">WhatsApp Number</label>
+          <Input
+            id="whatsappNumber"
+            name="whatsappNumber"
+            value={config.whatsappNumber || ''}
+            onChange={handleChange}
+            placeholder="e.g. whatsapp:+14155238886"
+            disabled={loading}
+          />
+        </div>
+        <Button type="submit" disabled={saving || loading} className="mt-4">
+          {saving ? 'Saving...' : 'Save WhatsApp Provider'}
+        </Button>
+      </form>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const [tab, setTab] = useState('organization');
   return (
@@ -834,6 +1067,8 @@ export default function SettingsPage() {
               <TabsTrigger value="security">Security</TabsTrigger>
               <TabsTrigger value="branding">Branding</TabsTrigger>
               <TabsTrigger value="uberSync">Uber Sync</TabsTrigger>
+              <TabsTrigger value="alertingControls">Alerting Controls</TabsTrigger>
+              <TabsTrigger value="whatsappProvider">WhatsApp Provider</TabsTrigger>
             </TabsList>
             <TabsContent value="organization">
               <OrganizationSection />
@@ -855,6 +1090,12 @@ export default function SettingsPage() {
             </TabsContent>
             <TabsContent value="uberSync">
               <UberSyncSection />
+            </TabsContent>
+            <TabsContent value="alertingControls">
+              <AlertingControlsSection />
+            </TabsContent>
+            <TabsContent value="whatsappProvider">
+              <WhatsAppProviderSection />
             </TabsContent>
           </Tabs>
         </div>

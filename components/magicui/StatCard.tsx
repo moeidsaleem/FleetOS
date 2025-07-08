@@ -20,8 +20,8 @@ export default function StatCard({ icon, label, value, sublabel, loading, color 
       className={`rounded-2xl bg-card/90 shadow-lg p-6 flex flex-col items-center justify-center min-h-[140px] border border-border hover:scale-[1.03] transition-transform ${color || ''}`}
     >
       <div className="mb-2 flex items-center justify-center text-primary">{icon}</div>
-      <div className="text-2xl font-bold mb-1 text-foreground">
-        {loading ? <Skeleton className="h-8 w-16" /> : value}
+      <div className="text-5xl font-extrabold mb-1 text-foreground drop-shadow-lg">
+        {loading ? <Skeleton className="h-12 w-32" /> : value}
       </div>
       <div className="text-sm text-muted-foreground font-medium mb-1">{label}</div>
       {sublabel && <div className="text-xs text-muted-foreground/70">{sublabel}</div>}

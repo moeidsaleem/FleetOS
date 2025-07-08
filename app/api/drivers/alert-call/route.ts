@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-// import { prisma } from '../../../../libs/database' // Commented out until alertCall model is added
+import { prisma } from '../../../../libs/database' // Commented out until alertCall model is added
 import { z } from 'zod'
 import { ElevenLabsService } from '../../../../lib/elevenlabs'
+import fs from 'fs/promises'
+import path from 'path'
 
 // Request validation schema
 const AlertCallRequestSchema = z.object({
@@ -11,7 +13,8 @@ const AlertCallRequestSchema = z.object({
   driverName: z.string().min(1),
   phoneNumber: z.string().min(1),
   currentScore: z.number().min(0).max(1),
-  language: z.string().optional().default('en') // Driver's preferred language
+  language: z.string().optional().default('en'), // Driver's preferred language
+  tone: z.string().optional().default('neutral')
 })
 
 // ElevenLabs API configuration
@@ -298,6 +301,25 @@ function generateFirstMessage(driverName: string, language: string = 'en') {
   return messages[language as keyof typeof messages] || messages.en;
 }
 
+// Helper to load versioned prompts
+async function getVersionedPrompt({ language, reason, tone, driverName }:{ language: string, reason: string, tone: string, driverName: string }): Promise<{ prompt: string, version: number }> {
+  const promptsPath = path.resolve(process.cwd(), 'prompts/alert-call-prompts.json')
+  const promptsData = JSON.parse(await fs.readFile(promptsPath, 'utf8'))
+  const version = promptsData.version || 1
+  const langPrompts = promptsData.languages[language] || promptsData.languages['en']
+  const tonePrompts = langPrompts?.[tone] || langPrompts?.['neutral']
+  let template = tonePrompts?.[reason] || promptsData.default?.[tone] || promptsData.default?.neutral
+  if (!template) template = 'Dear {DRIVER_NAME}, please address the following issue.'
+  return { prompt: template.replace('{DRIVER_NAME}', driverName), version }
+}
+
+// Helper to load voice config
+async function getVoiceId(language: string): Promise<string> {
+  const voicesPath = path.resolve(process.cwd(), 'config/voices.json')
+  const voicesData = JSON.parse(await fs.readFile(voicesPath, 'utf8'))
+  return voicesData[language] || voicesData['en']
+}
+
 export async function POST(request: NextRequest) {
   try {
     console.log('Received alert call request')
@@ -325,7 +347,8 @@ export async function POST(request: NextRequest) {
       driverName, 
       phoneNumber, 
       currentScore,
-      language = 'en'
+      language = 'en',
+      tone = 'neutral'
     } = AlertCallRequestSchema.parse(body)
 
     console.log(`Initiating alert call for driver: ${driverName} (${driverId}) - ${phoneNumber} in ${language}`)
@@ -349,71 +372,85 @@ export async function POST(request: NextRequest) {
       call_type: 'alert_call'
     }
 
-    // Generate customized prompt and first message based on language
-    const customPrompt = generateAlertCallPrompt(driverName, reason, message, currentScore, language)
-    const firstMessage = generateFirstMessage(driverName, language)
+    // Get versioned prompt and voice
+    const { prompt, version } = await getVersionedPrompt({ language, reason, tone, driverName })
+    const voiceId = await getVoiceId(language)
 
     console.log('Dynamic variables:', dynamicVariables)
     console.log('Language:', language)
-    console.log('Custom prompt length:', customPrompt.length)
+    console.log('Custom prompt length:', prompt.length)
 
-    // Make the outbound call with comprehensive configuration
-    const callResult = await elevenlabs.makeOutboundCall(
-      ELEVENLABS_AGENT_ID,
-      ELEVENLABS_AGENT_PHONE_NUMBER_ID,
-      phoneNumber,
-      {
-        dynamic_variables: dynamicVariables,
-        conversation_config_override: {
-          agent: {
-            prompt: {
-              prompt: customPrompt
-            },
-            first_message: firstMessage,
-            language: language
-          }
-        }
-      }
-    )
-
-    console.log('ElevenLabs call result:', callResult)
-
-    // Log the call attempt in the database (optional)
-    try {
-      // Note: Uncomment this when alertCall model is added to Prisma schema
-      /*
-      await prisma.alertCall.create({
-        data: {
-          driverId: driverId,
-          reason: reason,
-          message: message,
-          phoneNumber: phoneNumber,
-          status: callResult.success ? 'initiated' : 'failed',
-          conversationId: callResult.conversation_id || null,
-          callSid: callResult.callSid || null,
-          language: language,
-          createdAt: new Date()
-        }
-      })
-      */
-      console.log('Call logged successfully (database logging disabled)')
-    } catch (dbError) {
-      console.warn('Failed to log call in database:', dbError)
-      // Don't fail the entire request if database logging fails
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'Alert call initiated successfully',
+    // Save alert record with promptVersion
+    let alertRecord = await prisma.alertRecord.create({
       data: {
-        conversation_id: callResult.conversation_id,
-        callSid: callResult.callSid,
-        driver_name: driverName,
-        phone_number: phoneNumber,
-        language: language,
-        reason: reason
+        driverId,
+        alertType: 'CALL',
+        priority: 'HIGH',
+        reason,
+        message,
+        status: 'PENDING',
+        triggeredBy: 'MANUAL',
+        promptVersion: version,
       }
     })
+
+    // Make the outbound call
+    let callResult, callError = ''
+    try {
+      callResult = await elevenlabs.makeOutboundCall(
+        ELEVENLABS_AGENT_ID,
+        ELEVENLABS_AGENT_PHONE_NUMBER_ID,
+        phoneNumber,
+        {
+          dynamic_variables: dynamicVariables,
+          conversation_config_override: {
+            agent: {
+              prompt: {
+                prompt: prompt
+              },
+              first_message: generateFirstMessage(driverName, language),
+              language: language
+              // voice: voiceId, // Removed, not supported by API
+            }
+          }
+        }
+      )
+    } catch (err) {
+      callError = err instanceof Error ? err.message : 'Unknown error'
+    }
+    // Update alert record with result
+    const callSuccess = callResult && callResult.conversation_id
+    alertRecord = await prisma.alertRecord.update({
+      where: { id: alertRecord.id },
+      data: {
+        status: callSuccess ? 'SENT' : 'FAILED',
+        sentAt: callSuccess ? new Date() : undefined,
+        error: !callSuccess && callError ? callError : undefined,
+        conversationId: callSuccess ? callResult.conversation_id : undefined,
+      }
+    })
+    if (callSuccess) {
+      return NextResponse.json({
+        success: true,
+        message: 'Alert call initiated successfully',
+        data: {
+          conversation_id: callResult.conversation_id,
+          callSid: callResult.callSid,
+          driver_name: driverName,
+          phone_number: phoneNumber,
+          language: language,
+          reason: reason,
+          alertRecord,
+          promptVersion: version
+        }
+      })
+    } else {
+      return NextResponse.json({
+        success: false,
+        error: callError || 'Failed to initiate alert call',
+        data: { alertRecord }
+      }, { status: 500 })
+    }
 
   } catch (error) {
     console.error('ElevenLabs call failed:', error)
@@ -443,5 +480,18 @@ export async function POST(request: NextRequest) {
       },
       { status: statusCode }
     )
+  }
+} 
+
+// --- PREVIEW ENDPOINT ---
+export async function POST_PREVIEW(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { driverId, reason, message, driverName, currentScore, language, tone } = body as { driverId: string, reason: string, message: string, driverName: string, currentScore: number, language: string, tone: string }
+    const { prompt, version } = await getVersionedPrompt({ language, reason, tone, driverName })
+    return NextResponse.json({ success: true, preview: prompt, promptVersion: version })
+  } catch (error) {
+    console.error('Preview error:', error)
+    return NextResponse.json({ success: false, error: 'Failed to generate preview' }, { status: 500 })
   }
 } 

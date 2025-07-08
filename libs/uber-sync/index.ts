@@ -4,6 +4,10 @@ import { calculateDriverScore } from '../driver-scoring'
 import { DriverStatus } from '@prisma/client'
 import { scoreDriverFromAnalytics, defaultAnalyticsScoreConfig, AnalyticsMetrics, AnalyticsScoreConfig } from '../driver-scoring/analytics-score'
 import { Prisma } from '@prisma/client'
+import { sendDriverAlert } from '../alerts'
+import { addHours, isWithinInterval } from 'date-fns'
+
+const ALLOWED_CHANNELS = ['whatsapp', 'telegram', 'call', 'email'] as const
 
 export interface SyncResult {
   success: boolean
@@ -86,8 +90,8 @@ export class UberSyncService {
         const drivers = await prisma.driver.findMany({ where: { uberDriverId: { not: '' } } })
         const driverUuids = drivers.map(d => d.uberDriverId)
         const uberAPI = getUberAPI()
-        const now = Date.now()
-        const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000
+        const nowMs = Date.now()
+        const thirtyDaysAgo = nowMs - 30 * 24 * 60 * 60 * 1000
         const batchSize = 50
         // Load config from SystemConfig if available
         let analyticsScoreConfig: AnalyticsScoreConfig = defaultAnalyticsScoreConfig
@@ -99,22 +103,59 @@ export class UberSyncService {
         } catch {}
         for (let i = 0; i < driverUuids.length; i += batchSize) {
           const batch = driverUuids.slice(i, i + batchSize)
-          const analyticsResponse = await uberAPI.fetchDriverAnalytics(batch, sevenDaysAgo, now)
+          // Query Uber API for daily breakdown (add vs:date dimension)
+          const analyticsResponse = await uberAPI.analyticsDataQuery({
+            reportRequests: [
+              {
+                timeRanges: [{ startsAt: thirtyDaysAgo, endsAt: nowMs }],
+                dimensions: [
+                  { name: "vs:driver" },
+                  { name: "vs:date" }
+                ],
+                metrics: [
+                  { expression: "vs:HoursOnline" },
+                  { expression: "vs:HoursOnTrip" },
+                  { expression: "vs:TotalTrips" },
+                  { expression: "vs:TotalEarnings" }
+                ],
+                dimension_filter_clauses: [
+                  {
+                    operator: "FILTER_LOGICAL_OPERATOR_AND",
+                    filters: [
+                      {
+                        dimension_name: "vs:driver",
+                        operator: "OPERATOR_IN",
+                        expressions: batch
+                      }
+                    ]
+                  }
+                ],
+                pagination_options: { pageSize: 50 }
+              }
+            ],
+            orgId: { orgUuid: process.env.UBER_ORG_ID }
+          })
           const rows = analyticsResponse.reports?.[0]?.data?.timeRangeData?.[0]?.rows || []
           for (const row of rows) {
             const driverId = row.dimensionId as string
+            // If Uber returns date as a dimension value, use it
+            const dateIdx = row.dimensionValues?.findIndex((v: any) => /\d{4}-\d{2}-\d{2}/.test(v))
+            let date = new Date(nowMs)
+            if (dateIdx !== -1 && row.dimensionValues && row.dimensionValues[dateIdx]) {
+              date = new Date(row.dimensionValues[dateIdx])
+            }
             const [hoursOnline, hoursOnTrip, trips, earnings] = row.metricValues.map(parseFloat)
             const metrics: AnalyticsMetrics = { hoursOnline, hoursOnTrip, trips, earnings }
             const score = scoreDriverFromAnalytics(metrics, analyticsScoreConfig)
             // Find local driver by Uber UUID
             const localDriver = drivers.find(d => d.uberDriverId === driverId)
             if (!localDriver) continue
-            // Upsert metrics for today
+            // Upsert metrics for this day
             await prisma.driverMetrics.upsert({
               where: {
                 driverId_date: {
                   driverId: localDriver.id,
-                  date: new Date(new Date(now).toISOString().split('T')[0])
+                  date: new Date(date.toISOString().split('T')[0])
                 }
               },
               update: {
@@ -129,7 +170,7 @@ export class UberSyncService {
               },
               create: {
                 driverId: localDriver.id,
-                date: new Date(new Date(now).toISOString().split('T')[0]),
+                date: new Date(date.toISOString().split('T')[0]),
                 acceptanceRate: 0,
                 cancellationRate: 0,
                 completionRate: 0,
@@ -142,6 +183,102 @@ export class UberSyncService {
             })
           }
         }
+        // --- ADVANCED ALERTING CONTROLS ---
+        // Load alerting config from SystemConfig
+        let alertingHours: { start: number; end: number } = { start: 9, end: 18 }
+        let alertingReasons: string[] = ['low_analytics_score']
+        let alertingChannels: ('whatsapp' | 'telegram' | 'call' | 'email')[] = ['whatsapp']
+        let alertingCooldownHours = 24
+        let analyticsAlertThreshold = 0.6
+        try {
+          const [hoursCfg, reasonsCfg, channelsCfg, cooldownCfg, thresholdCfg] = await Promise.all([
+            prisma.systemConfig.findUnique({ where: { key: 'alertingHours' } }),
+            prisma.systemConfig.findUnique({ where: { key: 'alertingReasons' } }),
+            prisma.systemConfig.findUnique({ where: { key: 'alertingChannels' } }),
+            prisma.systemConfig.findUnique({ where: { key: 'alertingCooldownHours' } }),
+            prisma.systemConfig.findUnique({ where: { key: 'analyticsAlertThreshold' } })
+          ])
+          if (
+            hoursCfg &&
+            hoursCfg.value &&
+            typeof hoursCfg.value === 'object' &&
+            !Array.isArray(hoursCfg.value) &&
+            (hoursCfg.value as any).start !== undefined &&
+            (hoursCfg.value as any).end !== undefined
+          ) {
+            alertingHours = {
+              start: Number((hoursCfg.value as any).start),
+              end: Number((hoursCfg.value as any).end)
+            }
+          }
+          if (reasonsCfg && reasonsCfg.value && Array.isArray(reasonsCfg.value)) {
+            alertingReasons = reasonsCfg.value.filter((v: any) => typeof v === 'string')
+          }
+          if (channelsCfg && channelsCfg.value && Array.isArray(channelsCfg.value)) {
+            alertingChannels = channelsCfg.value.filter((v: any) => ALLOWED_CHANNELS.includes(v)) as typeof alertingChannels
+          }
+          if (cooldownCfg && cooldownCfg.value !== null && typeof cooldownCfg.value === 'number') {
+            alertingCooldownHours = cooldownCfg.value
+          }
+          if (thresholdCfg && thresholdCfg.value !== null && typeof thresholdCfg.value === 'number') {
+            analyticsAlertThreshold = thresholdCfg.value
+          }
+        } catch {}
+        // Only send alerts within allowed hours
+        const now = new Date()
+        const start = new Date(now)
+        start.setHours(alertingHours.start, 0, 0, 0)
+        const end = new Date(now)
+        end.setHours(alertingHours.end, 0, 0, 0)
+        if (!isWithinInterval(now, { start, end })) {
+          console.log(`[ALERT] Skipping alerting: outside allowed hours (${alertingHours.start}:00-${alertingHours.end}:00)`)
+        } else if (alertingReasons.includes('low_analytics_score')) {
+          // Find drivers with latest analyticsScore below threshold
+          const driversWithLowScore = await prisma.driver.findMany({
+            where: {
+              metrics: {
+                some: {
+                  date: { gte: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) },
+                  calculatedScore: { lt: analyticsAlertThreshold }
+                }
+              }
+            },
+            include: {
+              metrics: {
+                orderBy: { date: 'desc' },
+                take: 1
+              },
+              alerts: {
+                where: {
+                  reason: 'Low analytics-based performance score',
+                  createdAt: { gte: addHours(now, -alertingCooldownHours) }
+                },
+                orderBy: { createdAt: 'desc' },
+                take: 1
+              }
+            }
+          })
+          for (const driver of driversWithLowScore) {
+            const latest = driver.metrics[0]
+            if (!latest) continue
+            // Check cooldown: skip if recent alert for this reason
+            if (driver.alerts && driver.alerts.length > 0) {
+              console.log(`[ALERT] Skipping alert for driver ${driver.id}: cooldown active`)
+              continue
+            }
+            // Send alert using enabled channels
+            const alertResult = await sendDriverAlert({
+              driverId: driver.id,
+              reason: 'Low analytics-based performance score',
+              channels: alertingChannels,
+              customMessage: `Your recent analytics-based performance score is ${(latest.calculatedScore * 100).toFixed(1)}%. Please improve your activity and trip completion.`
+            })
+            if (!alertResult.success) {
+              result.errors.push(`Failed to alert driver ${driver.id}: ${alertResult.error}`)
+            }
+          }
+        }
+        // --- END ADVANCED ALERTING ---
       } catch (err) {
         console.error('Analytics scoring failed:', err)
       }

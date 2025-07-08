@@ -10,6 +10,7 @@ const ALLOWED_KEYS = [
   'notificationTemplates',
   'security',
   'branding',
+  'whatsapp',
 ] as const
 const ConfigKeySchema = z.enum(ALLOWED_KEYS)
 
@@ -21,8 +22,8 @@ export async function GET(request: NextRequest) {
     if (!key || !ALLOWED_KEYS.includes(key as any)) {
       // Special case for uberSyncStatus
       if (key === 'uberSyncStatus') {
-        const { uberSyncService } = await import('../../../libs/uber-sync')
-        const latestLog = await uberSyncService.getLatestSyncLog()
+        const { prisma } = await import('../../../libs/database')
+        const latestLog = await prisma.uberSyncLog.findFirst({ orderBy: { startedAt: 'desc' } })
         return NextResponse.json({ success: true, data: latestLog })
       }
       // Special case for uberSyncHistory

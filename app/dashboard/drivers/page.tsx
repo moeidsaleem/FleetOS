@@ -17,6 +17,7 @@ import { DashboardLayout } from '../../../components/layout/dashboard-layout'
 import Link from 'next/link'
 import { Dialog, DialogContent, DialogFooter } from '../../../components/ui/dialog'
 import Papa, { ParseResult, ParseError } from 'papaparse'
+import { getGradeFromScore } from '../../../libs/driver-scoring'
 
 interface Driver {
   id: string
@@ -96,17 +97,6 @@ export function DriversPage() {
   // Debounce search term
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
 
-  const getGradeFromScore = (score: number): string => {
-    if (score >= 0.95) return 'A+'
-    if (score >= 0.9) return 'A'
-    if (score >= 0.85) return 'B+'
-    if (score >= 0.8) return 'B'
-    if (score >= 0.75) return 'C+'
-    if (score >= 0.7) return 'C'
-    if (score >= 0.6) return 'D'
-    return 'F'
-  }
-
   const fetchDrivers = async (syncFromUber = false) => {
     try {
       setLoading(true)
@@ -119,7 +109,8 @@ export function DriversPage() {
         })
       }
       
-      const url = `/api/drivers${syncFromUber ? '?syncFromUber=true&limit=1000' : '?limit=1000'}`
+      // Always fetch only drivers, not alerts
+      const url = `/api/drivers?limit=1000`
       console.log('Fetching drivers from:', url)
       
       const response = await fetch(url)
@@ -154,8 +145,9 @@ export function DriversPage() {
       console.log('Raw drivers data:', data.data)
 
       // Use real data without mock enrichment
-      const driversWithMetrics = data.data.map((driver: Driver) => ({
+      const driversWithMetrics = data.data.map((driver: any) => ({
         ...driver,
+        phoneNumber: driver.phone || driver.phoneNumber || '', // Ensure phoneNumber is always present
         lastMetrics: driver.lastMetrics || {
           calculatedScore: driver.currentScore || 0,
           acceptanceRate: 0,
@@ -204,8 +196,8 @@ export function DriversPage() {
   }
 
   const filteredDrivers = drivers.filter(driver => {
-    const matchesSearch = driver.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
-                         driver.phoneNumber.includes(debouncedSearchTerm) ||
+    const matchesSearch = (driver.name && driver.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase())) ||
+                         (driver.phoneNumber && driver.phoneNumber.includes(debouncedSearchTerm)) ||
                          (driver.uberDriverId && driver.uberDriverId.toLowerCase().includes(debouncedSearchTerm.toLowerCase()))
     const matchesStatus = statusFilter === 'all' || driver.status === statusFilter
     const matchesGrade = gradeFilter === 'all' || driver.lastMetrics?.grade === gradeFilter
@@ -333,9 +325,9 @@ export function DriversPage() {
           <Button variant="outline" className="font-semibold" onClick={handleExport} disabled={exporting}>
             {exporting ? 'Exporting...' : 'Export'}
           </Button>
-          <Link href="/dashboard/drivers/add" passHref legacyBehavior>
+          <Link href="/dashboard/drivers/add" passHref >
             <Button asChild className="bg-blue-700 hover:bg-blue-800 text-white font-semibold rounded-lg shadow-md px-6 py-2">
-              <a><Plus className="h-4 w-4 mr-2" /> Add Driver</a>
+              <div><Plus className="h-4 w-4 mr-2" /> Add Driver</div>
             </Button>
           </Link>
         </div>
@@ -436,8 +428,8 @@ export function DriversPage() {
                   </TableCell>
                   <TableCell className="px-6 py-4 whitespace-nowrap">
                     {driver.lastMetrics ? (
-                      <Badge variant={getGradeBadgeVariant(driver.lastMetrics.grade)} className="text-xs">
-                        {driver.lastMetrics.grade}
+                      <Badge variant={getGradeBadgeVariant(getGradeFromScore(driver.lastMetrics.calculatedScore || 0))} className="text-xs">
+                        {getGradeFromScore(driver.lastMetrics.calculatedScore || 0)}
                       </Badge>
                     ) : (
                       <span className="text-muted-foreground">--</span>

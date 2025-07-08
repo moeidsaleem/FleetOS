@@ -87,6 +87,13 @@ export async function GET(
       feedback: metric.feedbackScore
     }))
 
+    // Calculate analytics trend (last 30 days)
+    const analyticsTrend = driver.metrics.slice(0, 30).map(metric => ({
+      date: metric.date,
+      analyticsMetrics: metric.analyticsMetrics || null,
+      analyticsScore: metric.calculatedScore || 0
+    }))
+
     // Calculate summary statistics
     const recentMetrics = driver.metrics.slice(0, days)
     const avgScore = recentMetrics.length > 0
@@ -115,6 +122,7 @@ export async function GET(
           analyticsMetrics,
           analyticsScore,
           trend: performanceTrend,
+          analyticsTrend,
           metricsCount: driver.metrics.length
         },
         alerts: {
@@ -125,7 +133,10 @@ export async function GET(
             reason: alert.reason,
             status: alert.status,
             sentAt: alert.sentAt,
-            createdAt: alert.createdAt
+            createdAt: alert.createdAt,
+            triggeredBy: alert.triggeredBy,
+            error: alert.error,
+            conversationId: alert.conversationId
           })),
           totalCount: driver.alerts.length
         },
@@ -368,5 +379,24 @@ export async function GET_ACTIVITY(
     return NextResponse.json({ success: true, data: activity })
   } catch (error) {
     return NextResponse.json({ success: false, error: 'Failed to fetch activity feed' }, { status: 500 })
+  }
+} 
+
+// GET /api/drivers/[id]/alert-history - Get last 3 alert/call records for the driver
+export async function GET_ALERT_HISTORY(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await context.params
+    const limit = parseInt(new URL(request.url).searchParams.get('limit') || '3')
+    const alerts = await prisma.alertRecord.findMany({
+      where: { driverId: id },
+      orderBy: { createdAt: 'desc' },
+      take: limit
+    })
+    return NextResponse.json({ success: true, history: alerts })
+  } catch (error) {
+    return NextResponse.json({ success: false, error: 'Failed to fetch alert/call history' }, { status: 500 })
   }
 } 

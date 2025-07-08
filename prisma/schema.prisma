@@ -66,10 +66,12 @@ model AlertRecord {
   readAt      DateTime?
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
-
+  triggeredBy TriggeredBy  @default(MANUAL)
+  error       String?
+  conversationId String? // ElevenLabs conversation ID for AI calls
+  promptVersion Int?
   // Relations
   driver      Driver       @relation(fields: [driverId], references: [id], onDelete: Cascade)
-
   @@map("alert_records")
 }
 
@@ -232,4 +234,9 @@ model DriverNote {
   driver    Driver   @relation(fields: [driverId], references: [id])
 
   @@index([driverId])
+} 
+
+enum TriggeredBy {
+  MANUAL
+  AUTO
 } 

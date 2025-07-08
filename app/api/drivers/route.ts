@@ -9,6 +9,7 @@ import formidable from 'formidable'
 import fs from 'fs/promises'
 import Papa from 'papaparse'
 import type { Fields, Files, File } from 'formidable'
+import { getGradeFromScore } from '../../../libs/driver-scoring'
 
 // Instantiate the UberSyncService
 const uberSyncService = new UberSyncService()
@@ -17,99 +18,94 @@ const uberSyncService = new UberSyncService()
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '10')
+    const email = searchParams.get('email')
+    const uberDriverId = searchParams.get('uberDriverId')
+    const limit = parseInt(searchParams.get('limit') || '100')
+    const offset = parseInt(searchParams.get('offset') || '0')
+    const driverId = searchParams.get('driverId')
+    const type = searchParams.get('type')
     const status = searchParams.get('status')
-    const search = searchParams.get('search')
-    const syncFromUber = searchParams.get('syncFromUber') === 'true'
+    const reason = searchParams.get('reason')
+    const from = searchParams.get('from')
+    const to = searchParams.get('to')
 
-    let syncResult = null
-    // Sync from Uber if requested (now uses OAuth Uber API client)
-    if (syncFromUber) {
-      console.log('Syncing drivers from Uber Fleet API (OAuth)...')
-      try {
-        syncResult = await uberSyncService.syncDriversFromUber('MANUAL', 'system')
-      } catch (error) {
-        console.error('Uber sync failed:', error)
-        syncResult = { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
-        // Continue with existing data even if sync fails
-      }
+    // If email or uberDriverId is present, filter by those fields only
+    if (email || uberDriverId) {
+      const where: any = {}
+      if (email) where.email = email
+      if (uberDriverId) where.uberDriverId = uberDriverId
+      const drivers = await prisma.driver.findMany({ where })
+      return NextResponse.json({ success: true, data: drivers })
     }
 
-    const skip = (page - 1) * limit
-
-    // Build where clause
-    const where: Prisma.DriverWhereInput = {}
-    
-    if (status) {
-      where.status = status as unknown as DriverStatus
+    // If no alert filters are present, return all drivers with performance and alert data
+    if (!driverId && !type && !status && !reason && !from && !to) {
+      const drivers = await prisma.driver.findMany({})
+      // For each driver, fetch latest metric and alert count
+      const driverData = await Promise.all(drivers.map(async (driver) => {
+        // Latest metric
+        const lastMetric = await prisma.driverMetrics.findFirst({
+          where: { driverId: driver.id },
+          orderBy: { date: 'desc' }
+        })
+        // Alert count
+        const recentAlertsCount = await prisma.alertRecord.count({
+          where: { driverId: driver.id }
+        })
+        // Calculate grade from calculatedScore
+        let grade = null
+        if (lastMetric && typeof lastMetric.calculatedScore === 'number') {
+          grade = getGradeFromScore(lastMetric.calculatedScore)
+        }
+        return {
+          ...driver,
+          lastMetrics: lastMetric ? {
+            calculatedScore: lastMetric.calculatedScore,
+            acceptanceRate: lastMetric.acceptanceRate,
+            cancellationRate: lastMetric.cancellationRate,
+            completionRate: lastMetric.completionRate,
+            feedbackScore: lastMetric.feedbackScore,
+            tripVolume: lastMetric.tripVolumeIndex,
+            idleRatio: lastMetric.idleRatio,
+            grade
+          } : null,
+          currentScore: lastMetric ? lastMetric.calculatedScore : null,
+          recentAlertsCount
+        }
+      }))
+      return NextResponse.json({ success: true, data: driverData })
     }
-    
-    if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } },
-        { phone: { contains: search } }
-      ]
+
+    const where: any = {}
+    if (driverId) where.driverId = driverId
+    if (type) where.alertType = type.toUpperCase()
+    if (status) where.status = status.toUpperCase()
+    if (reason) where.reason = reason
+    if (from || to) {
+      where.createdAt = {}
+      if (from) where.createdAt.gte = new Date(from)
+      if (to) where.createdAt.lte = new Date(to)
     }
 
-    // Get drivers with their latest metrics
-    const [drivers, total] = await Promise.all([
-      prisma.driver.findMany({
-        where,
-        skip,
-        take: limit,
-        include: {
-          metrics: {
-            orderBy: { date: 'desc' },
-            take: 1
-          },
-          alerts: {
-            where: {
-              createdAt: {
-                gte: new Date(Date.now() - 24 * 60 * 60 * 1000) // Last 24 hours
-              }
-            },
-            take: 5
-          }
-        },
-        orderBy: { name: 'asc' }
-      }),
-      prisma.driver.count({ where })
-    ])
-
-    // Calculate additional fields
-    const driversWithScores = drivers.map((driver) => ({
-      ...driver,
-      currentScore: driver.metrics[0]?.calculatedScore || 0,
-      analyticsMetrics: driver.metrics[0]?.analyticsMetrics || null,
-      analyticsScore: driver.metrics[0]?.calculatedScore || 0,
-      recentAlertsCount: driver.alerts.length,
-      lastMetricDate: driver.metrics[0]?.date || null,
-      phoneNumber: driver.phone, // Map to expected field name
-    }))
-
+    const alerts = await prisma.alertRecord.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: offset,
+      take: limit,
+      include: { driver: true }
+    })
+    const total = await prisma.alertRecord.count({ where })
     return NextResponse.json({
       success: true,
-      // Return drivers directly under 'data' for compatibility
-      data: driversWithScores,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit)
-      },
-      syncResult,
-      timestamp: new Date()
+      data: alerts.map(alert => ({
+        ...alert,
+        conversationId: alert.conversationId
+      })),
+      total
     })
-
   } catch (error) {
-    console.error('Error fetching drivers:', error)
-    return NextResponse.json({
-      success: false,
-      error: 'Failed to fetch drivers',
-      timestamp: new Date()
-    }, { status: 500 })
+    console.error('Failed to fetch alerts:', error)
+    return NextResponse.json({ success: false, error: 'Failed to fetch alerts' }, { status: 500 })
   }
 }
 

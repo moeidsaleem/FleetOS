@@ -45,4 +45,10 @@ export async function withTransaction<T>(
   return await prisma.$transaction(fn)
 }
 
+// Fetch a system config value by key
+export async function getSystemConfig(key: string): Promise<any | null> {
+  const config = await prisma.systemConfig.findUnique({ where: { key } });
+  return config ? config.value : null;
+}
+
 export default prisma 

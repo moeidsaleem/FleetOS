@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "languages": {
+    "en": {
+      "friendly": {
+        "poor_performance": "Hi {DRIVER_NAME}, this is a friendly call from Mr. Nice Drive. We noticed your recent performance metrics are below our standards. Let's discuss how we can help you improve!",
+        "wrong_area": "Hi {DRIVER_NAME}, you're currently outside your designated service area. Please return to your assigned area when possible. Let us know if you need help!"
+      },
+      "firm": {
+        "poor_performance": "Hello {DRIVER_NAME}, this is Mr. Nice Drive. Your recent performance is below company standards. Please review your trips and take immediate steps to improve.",
+        "wrong_area": "Hello {DRIVER_NAME}, you are operating outside your assigned area. Please return immediately to avoid further action."
+      },
+      "urgent": {
+        "poor_performance": "Attention {DRIVER_NAME}, your performance is critically low. Immediate improvement is required to continue with Mr. Nice Drive.",
+        "wrong_area": "Attention {DRIVER_NAME}, you must return to your assigned area now. Continued non-compliance may result in suspension."
+      },
+      "neutral": {
+        "poor_performance": "Dear {DRIVER_NAME}, your recent performance metrics are below our standards. Please review your recent trips and take steps to improve.",
+        "wrong_area": "Dear {DRIVER_NAME}, you are currently operating outside your designated service area. Please return to your assigned area as soon as possible."
+      }
+    },
+    "ur": {
+      "friendly": {
+        "poor_performance": "محترم {DRIVER_NAME}، یہ Mr. Nice Drive کی طرف سے ایک دوستانہ کال ہے۔ آپ کی حالیہ کارکردگی معیار سے کم ہے۔ براہ کرم بہتری کے لیے اقدامات کریں۔",
+        "wrong_area": "محترم {DRIVER_NAME}، آپ اس وقت اپنے مقررہ علاقے سے باہر ہیں۔ براہ کرم جلد از جلد واپس آئیں۔ اگر مدد چاہیے تو بتائیں۔"
+      },
+      "firm": {
+        "poor_performance": "{DRIVER_NAME}، آپ کی کارکردگی کمپنی کے معیار سے کم ہے۔ فوری بہتری کی ضرورت ہے۔",
+        "wrong_area": "{DRIVER_NAME}، آپ اپنے علاقے سے باہر ہیں۔ فوراً واپس آئیں۔"
+      },
+      "urgent": {
+        "poor_performance": "توجہ دیں {DRIVER_NAME}، آپ کی کارکردگی بہت کم ہے۔ فوری بہتری ضروری ہے۔",
+        "wrong_area": "توجہ دیں {DRIVER_NAME}، فوراً اپنے علاقے میں واپس جائیں۔"
+      },
+      "neutral": {
+        "poor_performance": "{DRIVER_NAME}، آپ کی حالیہ کارکردگی معیار سے کم ہے۔ براہ کرم بہتری کے لیے اقدامات کریں۔",
+        "wrong_area": "{DRIVER_NAME}، آپ اس وقت اپنے مقررہ علاقے سے باہر ہیں۔ براہ کرم جلد از جلد واپس آئیں۔"
+      }
+    }
+  },
+  "default": {
+    "neutral": "Dear {DRIVER_NAME}, please address the following issue: {REASON}."
+  }
+}

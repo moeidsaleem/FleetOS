@@ -210,24 +210,23 @@ export function Sidebar({ className }: SidebarProps) {
               {section.items.map((item, itemIdx) => {
                 const isActive = pathname === item.href
                 return (
-                  <Link key={itemIdx} href={item.href} legacyBehavior>
-                    <a
-                      className={cn(
-                        "flex items-center gap-3 px-3 py-2 rounded-xl text-foreground hover:bg-muted hover:shadow-lg transition-all duration-200 group relative overflow-hidden",
-                        isActive && "bg-muted font-bold shadow-lg scale-[1.03] ring-2 ring-blue-400/70 ring-offset-2 ring-offset-card before:absolute before:inset-0 before:bg-gradient-to-r before:from-blue-400/20 before:to-purple-400/20 before:blur before:opacity-60 before:rounded-xl"
-                      )}
-                    >
-                      <item.icon className="h-5 w-5 flex-shrink-0 transition-transform group-hover:scale-125 duration-200" />
-                      <span className={cn(
-                        "flex-1 text-base truncate",
-                        isCollapsed && "hidden"
-                      )}>{item.title}</span>
-                      {item.badge && !isCollapsed && (
-                        <Badge variant={item.badge === 'Warning' ? 'destructive' : 'default'} className="ml-2 text-xs">
-                          {item.badge}
-                        </Badge>
-                      )}
-                    </a>
+                  <Link key={itemIdx} href={item.href}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2 rounded-xl text-foreground hover:bg-muted hover:shadow-lg transition-all duration-200 group relative overflow-hidden",
+                      isActive && "bg-muted font-bold shadow-lg scale-[1.03] ring-2 ring-blue-400/70 ring-offset-2 ring-offset-card before:absolute before:inset-0 before:bg-gradient-to-r before:from-blue-400/20 before:to-purple-400/20 before:blur before:opacity-60 before:rounded-xl"
+                    )}
+                    tabIndex={0}
+                  >
+                    <item.icon className="h-5 w-5 flex-shrink-0 transition-transform group-hover:scale-125 duration-200" />
+                    <span className={cn(
+                      "flex-1 text-base truncate",
+                      isCollapsed && "hidden"
+                    )}>{item.title}</span>
+                    {item.badge && !isCollapsed && (
+                      <Badge variant={item.badge === 'Warning' ? 'destructive' : 'default'} className="ml-2 text-xs">
+                        {item.badge}
+                      </Badge>
+                    )}
                   </Link>
                 )
               })}

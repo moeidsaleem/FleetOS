@@ -38,6 +38,42 @@ export default function Hero() {
         <h1 className="text-4xl font-bold text-white"> 
           Welcome to Fleet OS 
         </h1>
+         <motion.div
+           initial={{ y: 20, opacity: 0 }}
+           animate={{ y: 0, opacity: 1 }}
+           transition={{ delay: 0.5, duration: 0.8, ease: "easeOut" }}
+         >
+           <Link href="/dashboard/drivers">
+             <Button 
+               className="group relative overflow-hidden bg-gradient-to-r  from-blue-600/5 via-purple-600/5 to-pink-600/5 text-white px-8 py-4 rounded-2xl font-semibold text-lg hover:text-black shadow-2xl hover:shadow-purple-500/25 transition-all duration-300 hover:scale-105 border-0"
+             
+             >
+               <motion.div
+                 className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent"
+                 initial={{ x: "-100%" }}
+                 whileHover={{ x: "100%" }}
+                 transition={{ duration: 0.6 }}
+               />
+               <span className="relative z-10 flex items-center gap-3">
+                 <motion.div
+                   animate={{ rotate: 360 }}
+                   transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                 >
+                   <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center">
+                     <ArrowRightIcon className="w-4 h-4 text-white" />
+                   </div>
+                 </motion.div>
+                 Summon Fleet Commander
+                 <motion.div
+                   animate={{ x: [0, 5, 0] }}
+                   transition={{ duration: 1.5, repeat: Infinity }}
+                 >
+                   <ArrowRightIcon className="w-5 h-5" />
+                 </motion.div>
+               </span>
+             </Button>
+           </Link>
+         </motion.div>
     
       </div>
     

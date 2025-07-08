@@ -1,10 +1,10 @@
 import { prisma } from '../database'
-import { getWhatsAppService } from './whatsapp'
 import { getTelegramService } from './telegram'
 import { getVoiceService } from './voice'
 import { getAlertPriority } from '../driver-scoring'
 import { AlertTypeSchema, AlertPrioritySchema } from '../../types'
 import { z } from 'zod'
+import { sendWhatsAppMessage } from './whatsapp';
 
 type AlertType = z.infer<typeof AlertTypeSchema>
 type AlertPriority = z.infer<typeof AlertPrioritySchema>
@@ -15,6 +15,7 @@ export interface AlertRequest {
   priority?: AlertPriority
   channels?: AlertType[]
   customMessage?: string
+  triggeredBy?: 'MANUAL' | 'AUTO'
 }
 
 export interface AlertResult {
@@ -24,6 +25,7 @@ export interface AlertResult {
     [key in AlertType]?: boolean
   }
   error?: string
+  alertRecord?: any // Add the full alert record
 }
 
 export class AlertOrchestrator {
@@ -48,82 +50,84 @@ export class AlertOrchestrator {
       }
 
       const latestMetrics = driver.metrics[0]
-      if (!latestMetrics) {
-        throw new Error(`No metrics found for driver ${request.driverId}`)
-      }
+      // If no metrics, use default score 0
+      const calculatedScore = latestMetrics?.calculatedScore ?? 0
 
       // Determine alert priority if not provided
-      const priority = request.priority || getAlertPriority(latestMetrics.calculatedScore)
-      
+      const priority = request.priority || getAlertPriority(calculatedScore)
       // Determine channels if not provided
       const channels = request.channels || this.getDefaultChannels(priority)
+      // Determine triggeredBy
+      const triggeredBy = request.triggeredBy || 'MANUAL'
 
       // Create alert record - map to Prisma enum values
-      const alertRecord = await prisma.alertRecord.create({
+      let alertRecord = await prisma.alertRecord.create({
         data: {
           driverId: request.driverId,
           alertType: this.mapToPrismaAlertType(channels[0]), // Primary channel
           priority: this.mapToPrismaPriority(priority),
           reason: request.reason,
-          message: request.customMessage || this.generateMessage(driver.name, latestMetrics.calculatedScore, request.reason),
-          status: 'PENDING'
+          message: request.customMessage || this.generateMessage(driver.name, calculatedScore, request.reason),
+          status: 'PENDING',
+          triggeredBy: triggeredBy,
         }
       })
 
       // Send alerts through each channel
       const channelResults: { [key in AlertType]?: boolean } = {}
-      
+      let errorMsg = ''
       for (const channel of channels) {
         let success = false
-        
         try {
           switch (channel) {
             case 'whatsapp':
-              success = await this.sendWhatsAppAlert(driver, latestMetrics.calculatedScore, request.reason)
+              success = await this.sendWhatsAppAlert(driver, calculatedScore, request.reason, request.customMessage)
               break
             case 'telegram':
-              success = await this.sendTelegramAlert(driver, latestMetrics.calculatedScore, request.reason)
+              success = await this.sendTelegramAlert(driver, calculatedScore, request.reason)
               break
             case 'call':
-              success = await this.sendVoiceAlert(driver, latestMetrics.calculatedScore, request.reason, priority)
+              success = await this.sendVoiceAlert(driver, calculatedScore, request.reason, priority)
               break
             case 'email':
               // TODO: Implement email service
               success = false
               break
           }
-          
           channelResults[channel] = success
         } catch (error) {
           console.error(`Failed to send ${channel} alert:`, error)
           channelResults[channel] = false
+          errorMsg = error instanceof Error ? error.message : 'Unknown error'
         }
       }
 
       // Update alert record with results
       const overallSuccess = Object.values(channelResults).some(result => result === true)
-      
-      await prisma.alertRecord.update({
+      alertRecord = await prisma.alertRecord.update({
         where: { id: alertRecord.id },
         data: {
           status: overallSuccess ? 'SENT' : 'FAILED',
-          sentAt: overallSuccess ? new Date() : undefined
+          sentAt: overallSuccess ? new Date() : undefined,
+          error: !overallSuccess && errorMsg ? errorMsg : undefined,
         }
       })
 
       return {
         success: overallSuccess,
         alertId: alertRecord.id,
-        channelResults
+        channelResults,
+        error: !overallSuccess && errorMsg ? errorMsg : undefined,
+        alertRecord,
       }
-      
     } catch (error) {
       console.error('Alert orchestrator error:', error)
       return {
         success: false,
         alertId: '',
         channelResults: {},
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
+        alertRecord: undefined,
       }
     }
   }
@@ -196,7 +200,8 @@ export class AlertOrchestrator {
                 driverId: driver.id,
                 reason: `Automatic alert: ${rule.description}`,
                 priority: this.mapRulePriority(conditions),
-                channels: actions.map(action => action.type)
+                channels: actions.map(action => action.type),
+                triggeredBy: 'AUTO'
               })
               
               console.log(`📨 Automatic alert sent to ${driver.name} (Rule: ${rule.name})`)
@@ -214,22 +219,34 @@ export class AlertOrchestrator {
   /**
    * Send WhatsApp alert
    */
-  private async sendWhatsAppAlert(driver: Record<string, unknown>, score: number, reason: string): Promise<boolean> {
-    if (!driver.whatsappNumber) {
-      console.log(`No WhatsApp number for driver ${driver.name}`)
+  private async sendWhatsAppAlert(driver: Record<string, unknown>, score: number, reason: string, customMessage?: string, lastInbound?: Date): Promise<boolean> {
+    // Use whatsappNumber if present, otherwise fallback to phone
+    const toNumber = driver.whatsappNumber || driver.phone;
+    if (!toNumber) {
+      console.log(`No WhatsApp or phone number for driver ${driver.name}`)
       return false
     }
-    
     try {
-      const whatsappService = getWhatsAppService()
-      return await whatsappService.sendDriverAlert(
-        driver.whatsappNumber as string, 
-        driver.name as string, 
-        score, 
-        reason
-      )
-    } catch {
-      console.error('WhatsApp service not configured')
+      const now = Date.now();
+      const lastInboundTime = lastInbound ? new Date(lastInbound).getTime() : 0;
+      const isWithin24h = lastInboundTime && (now - lastInboundTime < 24 * 60 * 60 * 1000);
+      const message = customMessage || `Performance Alert for ${driver.name}: Score ${(score * 100).toFixed(1)}% - ${reason}`;
+      if (isWithin24h) {
+        // Freeform message
+        await sendWhatsAppMessage(toNumber as string, message);
+      } else {
+        // Template message (driver_alert)
+        await sendWhatsAppMessage(toNumber as string, '', {
+          templateSid: 'HX7fc60af9f0feb4e21684c0687c9ce71f',
+          templateVars: {
+            1: String(driver.name),
+            2: reason,
+          },
+        });
+      }
+      return true;
+    } catch (err) {
+      console.error('WhatsApp send error:', err)
       return false
     }
   }

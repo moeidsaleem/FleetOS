@@ -73,11 +73,13 @@ export function QuickActions({ className }: QuickActionsProps) {
       <CardContent>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {quickActions.map((action, index) => (
-            <Link key={index} href={action.href}>
-              <Button 
-                variant={action.variant} 
-                className="w-full justify-start h-auto p-4 relative"
-              >
+            <Button 
+              key={index}
+              variant={action.variant} 
+              className="w-full justify-start h-auto p-4 relative"
+              asChild
+            >
+              <Link href={action.href}>
                 <div className="flex items-center gap-3">
                   <action.icon className="h-5 w-5" />
                   <div className="text-left">
@@ -93,8 +95,8 @@ export function QuickActions({ className }: QuickActionsProps) {
                     {action.badge}
                   </Badge>
                 )}
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           ))}
         </div>
         
