@@ -1,5 +1,5 @@
 {
-  "name": "mr-niceguy",
+  "name": "fleetos",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -12,6 +12,7 @@
     "test:enhanced-call": "tsx scripts/test-enhanced-call.ts",
     "prisma:reset": "prisma migrate reset",
     "prisma:migrate": "prisma migrate dev",
+
     "prisma:studio": "prisma studio",
     "prisma:generate": "prisma generate",
     "postinstall": "prisma generate"
