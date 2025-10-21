@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '../../../components/ui/button'
 import { Input } from '../../../components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select'
@@ -60,17 +60,17 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue
 }
 
-export default function ProtectedDriversPage(props: React.ComponentPropsWithoutRef<'div'>) {
+export default function ProtectedDriversPage() {
   return (
     <RequireAuth>
       <DashboardLayout>
-        <DriversPage {...props} />
+        <DriversPage />
       </DashboardLayout>
     </RequireAuth>
   )
 }
 
-export function DriversPage() {
+function DriversPage() {
   const [drivers, setDrivers] = useState<Driver[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -97,7 +97,7 @@ export function DriversPage() {
   // Debounce search term
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
 
-  const fetchDrivers = async (syncFromUber = false) => {
+  const fetchDrivers = useCallback(async (syncFromUber = false) => {
     try {
       setLoading(true)
       setError(null)
@@ -182,11 +182,11 @@ export function DriversPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [toast])
 
   useEffect(() => {
     fetchDrivers()
-  }, [])
+  }, [fetchDrivers])
 
   const getGradeBadgeVariant = (grade: string) => {
     if (['A+', 'A'].includes(grade)) return 'default'

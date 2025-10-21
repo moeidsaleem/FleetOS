@@ -5,11 +5,11 @@ import { ReportsClient } from '@/components/reports/reports-client'
 import { RequireAuth } from '@/components/auth/require-auth'
 import React from 'react'
 
-export default function ProtectedReportsPage(props: React.ComponentPropsWithoutRef<'div'>) {
+export default function ProtectedReportsPage() {
   return (
     <RequireAuth>
       <DashboardLayout>
-        <ReportsPage {...props} />
+        <ReportsPage />
       </DashboardLayout>
     </RequireAuth>
   )

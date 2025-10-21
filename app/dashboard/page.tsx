@@ -74,10 +74,10 @@ interface ChartData {
   }>
 }
 
-export default function ProtectedDashboardPage(props: React.ComponentPropsWithoutRef<'div'>) {
+export default function ProtectedDashboardPage() {
   return (
     <RequireAuth>
-      <DashboardPage {...props} />
+      <DashboardPage />
     </RequireAuth>
   )
 }

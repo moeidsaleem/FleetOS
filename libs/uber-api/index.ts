@@ -309,6 +309,40 @@ export class UberFleetAPI {
     if (!res.ok) throw new Error(`Uber analytics fetch failed: ${res.statusText}`);
     return res.json();
   }
+
+  // Create report download URL
+  async createReportDownloadUrl(reportId: string): Promise<{ download_url: string }> {
+    const accessToken = await fetchUberAccessToken();
+    const url = `${this.baseURL}/v1/organizations/${this.organizationId}/reports/${reportId}/download`;
+    
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      }
+    });
+
+    if (!res.ok) throw new Error(`Uber report download URL creation failed: ${res.statusText}`);
+    return res.json();
+  }
+
+  // Get report by ID
+  async getReportById(reportId: string): Promise<any> {
+    const accessToken = await fetchUberAccessToken();
+    const url = `${this.baseURL}/v1/organizations/${this.organizationId}/reports/${reportId}`;
+    
+    const res = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      }
+    });
+
+    if (!res.ok) throw new Error(`Uber report fetch failed: ${res.statusText}`);
+    return res.json();
+  }
 }
 
 // Singleton instance

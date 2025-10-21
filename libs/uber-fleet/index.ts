@@ -260,6 +260,15 @@ class UberFleetAPI {
   isAPIConfigured(): boolean {
     return this.isConfigured
   }
+
+  // Create report download URL
+  async createReportDownloadUrl(reportId: string): Promise<{ download_url: string }> {
+    const response = await this.makeRequest<{ download_url: string }>(
+      `/reports/${reportId}/download`,
+      { method: 'POST' }
+    )
+    return response
+  }
 }
 
 export const uberFleetAPI = new UberFleetAPI() 

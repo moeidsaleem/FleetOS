@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '../../../../libs/database'
-import { uberSyncService } from '../../../../libs/uber-sync'
+import { prisma } from '@/libs/database'
+import { UberSyncService } from '@/libs/uber-sync'
 
 export async function POST(
   request: NextRequest,
@@ -13,10 +13,14 @@ export async function POST(
     if (!driver || !driver.uberDriverId) {
       return NextResponse.json({ success: false, error: 'Driver or Uber ID not found' }, { status: 404 })
     }
+    const uberSyncService = new UberSyncService()
     // Sync this driver from Uber
-    await uberSyncService.syncSpecificDriver(driver.uberDriverId)
+    const result = await uberSyncService.syncDriversFromUber('MANUAL', 'system')
+    if (!result.success) {
+      return NextResponse.json({ success: false, error: result.errors[0] }, { status: 500 })
+    }
     return NextResponse.json({ success: true, message: 'Driver synced from Uber' })
   } catch (error) {
     return NextResponse.json({ success: false, error: error instanceof Error ? error.message : 'Sync failed' }, { status: 500 })
   }
-} 
+}

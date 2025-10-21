@@ -20,7 +20,7 @@ const lexend = Lexend({
 //   description: "Advanced driver performance tracking and alerting system for Dubai limousine fleet",
 // };
 
-export const DarkModeContext = createContext<{ darkMode: boolean, setDarkMode: (v: boolean) => void }>({ darkMode: false, setDarkMode: () => {} })
+const DarkModeContext = createContext<{ darkMode: boolean, setDarkMode: (v: boolean) => void }>({ darkMode: false, setDarkMode: () => {} })
 
 export default function RootLayout({
   children,

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../../components/ui/card'
@@ -124,17 +124,17 @@ function validateEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 }
 
-export default function ProtectedDriverDetailPage(props: React.ComponentPropsWithoutRef<'div'>) {
+export default function ProtectedDriverDetailPage() {
   return (
     <RequireAuth>
       <DashboardLayout>
-        <DriverDetailPage {...props} />
+        <DriverDetailPage />
       </DashboardLayout>
     </RequireAuth>
   )
 }
 
-function DriverDetailPage(props: React.ComponentPropsWithoutRef<'div'>) {
+function DriverDetailPage() {
   const params = useParams()
   const [driver, setDriver] = useState<DriverDetail | null>(null)
   const [loading, setLoading] = useState(true)
@@ -152,7 +152,7 @@ function DriverDetailPage(props: React.ComponentPropsWithoutRef<'div'>) {
   const [editDuplicate, setEditDuplicate] = useState<{ email: boolean; uberDriverId: boolean }>({ email: false, uberDriverId: false })
   const [syncing, setSyncing] = useState(false)
 
-  const fetchDriverDetails = async () => {
+  const fetchDriverDetails = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -175,11 +175,11 @@ function DriverDetailPage(props: React.ComponentPropsWithoutRef<'div'>) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [params.id, includeUberData])
 
   useEffect(() => {
     fetchDriverDetails()
-  }, [params.id, includeUberData])
+  }, [fetchDriverDetails])
 
   useEffect(() => {
     if (driver) {
@@ -1029,7 +1029,7 @@ function DriverDocuments({ driverId }: { driverId: string }) {
   const [deleting, setDeleting] = useState(false)
   const { toast } = useToast()
 
-  const fetchDocuments = async () => {
+  const fetchDocuments = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
@@ -1042,8 +1042,8 @@ function DriverDocuments({ driverId }: { driverId: string }) {
     } finally {
       setLoading(false)
     }
-  }
-  useEffect(() => { fetchDocuments() }, [driverId])
+  }, [driverId])
+  useEffect(() => { fetchDocuments() }, [fetchDocuments])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFile(e.target.files?.[0] || null)
@@ -1243,7 +1243,7 @@ function DriverNotes({ driverId }: { driverId: string }) {
   const { data: session } = useSession();
   const author = session?.user?.name || 'Unknown'
 
-  const fetchNotes = async () => {
+  const fetchNotes = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
@@ -1256,8 +1256,8 @@ function DriverNotes({ driverId }: { driverId: string }) {
     } finally {
       setLoading(false)
     }
-  }
-  useEffect(() => { fetchNotes() }, [driverId])
+  }, [driverId])
+  useEffect(() => { fetchNotes() }, [fetchNotes])
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()

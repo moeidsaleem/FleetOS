@@ -1,4 +1,4 @@
-import NextAuth, { AuthOptions, SessionStrategy } from "next-auth"
+import { AuthOptions, SessionStrategy } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import { PrismaAdapter } from "@next-auth/prisma-adapter"
 import { PrismaClient, User as PrismaUser } from "@prisma/client"
@@ -8,7 +8,7 @@ import type { AdapterUser } from "next-auth/adapters"
 
 const prisma = new PrismaClient()
 
-const authOptions = {
+export const authOptions: AuthOptions = {
   adapter: PrismaAdapter(prisma),
   session: {
     strategy: "jwt" as SessionStrategy
@@ -27,7 +27,7 @@ const authOptions = {
         const isValid = await bcrypt.compare(credentials.password, user.password)
         if (!isValid) return null
         // Don't return password hash
-        const { password, ...userWithoutPassword } = user
+        const { password: _pw, ...userWithoutPassword } = user
         return userWithoutPassword as Omit<PrismaUser, 'password'>
       }
     })
@@ -35,7 +35,7 @@ const authOptions = {
   callbacks: {
     async jwt({ token, user }: {
       token: JWT;
-      user?: AdapterUser | PrismaUser;
+      user?: AdapterUser & { emailVerified: Date | null } | (PrismaUser & { emailVerified: Date | null });
       account?: any;
       profile?: any;
       trigger?: "signIn" | "signUp" | "update";
@@ -47,7 +47,7 @@ const authOptions = {
         const safeUser = {
           ...user,
           emailVerified: (user as AdapterUser).emailVerified ?? (user as any).emailVerified ?? null
-        } as AdapterUser & { role?: string }
+        } as AdapterUser & { role?: string; emailVerified: Date | null | undefined }
         token.id = safeUser.id
         if (safeUser.role) token.role = safeUser.role
         token.email = safeUser.email
@@ -69,6 +69,3 @@ const authOptions = {
     signIn: "/login"
   }
 }
-
-const handler = NextAuth(authOptions as AuthOptions)
-export { handler as GET, handler as POST } 

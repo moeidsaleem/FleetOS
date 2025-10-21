@@ -482,16 +482,3 @@ export async function POST(request: NextRequest) {
     )
   }
 } 
-
-// --- PREVIEW ENDPOINT ---
-export async function POST_PREVIEW(request: NextRequest) {
-  try {
-    const body = await request.json()
-    const { driverId, reason, message, driverName, currentScore, language, tone } = body as { driverId: string, reason: string, message: string, driverName: string, currentScore: number, language: string, tone: string }
-    const { prompt, version } = await getVersionedPrompt({ language, reason, tone, driverName })
-    return NextResponse.json({ success: true, preview: prompt, promptVersion: version })
-  } catch (error) {
-    console.error('Preview error:', error)
-    return NextResponse.json({ success: false, error: 'Failed to generate preview' }, { status: 500 })
-  }
-} 

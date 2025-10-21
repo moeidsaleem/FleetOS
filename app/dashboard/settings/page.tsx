@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Eye, EyeOff } from 'lucide-react';
+import Image from 'next/image';
 
 const TEMPLATE_TYPES = ['whatsapp', 'telegram', 'email', 'voice'] as const;
 
@@ -172,7 +173,7 @@ function OrganizationSection() {
             disabled={loading}
           />
           {org.logoUrl && (
-            <img src={org.logoUrl} alt="Logo preview" className="mt-2 h-16" style={{ maxWidth: 120, objectFit: 'contain' }} />
+            <Image src={org.logoUrl} alt="Logo preview" width={120} height={64} className="mt-2" style={{ objectFit: 'contain' }} />
           )}
         </div>
         <Button type="submit" disabled={saving || loading} className="mt-4">
@@ -665,7 +666,7 @@ function BrandingSection() {
             disabled={loading}
           />
           {branding.logoUrl && (
-            <img src={branding.logoUrl} alt="Logo preview" className="mt-2 h-16" style={{ maxWidth: 120, objectFit: 'contain' }} />
+            <Image src={branding.logoUrl} alt="Logo preview" width={120} height={64} className="mt-2" style={{ objectFit: 'contain' }} />
           )}
         </div>
         <div>
@@ -679,7 +680,7 @@ function BrandingSection() {
             disabled={loading}
           />
           {branding.faviconUrl && (
-            <img src={branding.faviconUrl} alt="Favicon preview" className="mt-2 h-10" style={{ maxWidth: 40, objectFit: 'contain' }} />
+            <Image src={branding.faviconUrl} alt="Favicon preview" width={40} height={40} className="mt-2" style={{ objectFit: 'contain' }} />
           )}
         </div>
         <div>

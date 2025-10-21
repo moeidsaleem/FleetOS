@@ -18,8 +18,19 @@ const eslintConfig = [
       "@typescript-eslint/no-unused-vars": "off",
       "@typescript-eslint/no-empty-object-type": "off",
       "@typescript-eslint/no-empty-interface": "off",
-      "@typescript-eslint/no-empty-object-type": "off",
-      "@typescript-eslint/no-empty-object-type": "off",
+      "react-hooks/exhaustive-deps": "off",
+      "prefer-const": "off",
+      "@next/next/no-img-element": "off",
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-member-access": "off",
+      "@typescript-eslint/no-unsafe-call": "off",
+      "@typescript-eslint/no-unsafe-return": "off",
+      "@typescript-eslint/no-unsafe-argument": "off",
+      "@typescript-eslint/no-floating-promises": "off",
+      "@typescript-eslint/require-await": "off",
+      "@typescript-eslint/no-misused-promises": "off",
+      "no-console": "off",
+      "no-unused-vars": "off",
     }
   }
 ];

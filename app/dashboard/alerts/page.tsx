@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { DashboardLayout } from '../../../components/layout/dashboard-layout'
 import { RequireAuth } from '../../../components/auth/require-auth'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/table'
@@ -48,7 +48,7 @@ function AlertsTable() {
   const [refresh, setRefresh] = useState(0)
   const { toast } = useToast()
 
-  const fetchAlerts = async () => {
+  const fetchAlerts = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
@@ -69,9 +69,9 @@ function AlertsTable() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [driverId, type, status, reason, from, to])
 
-  useEffect(() => { fetchAlerts() }, [driverId, type, status, reason, from, to, refresh])
+  useEffect(() => { fetchAlerts() }, [driverId, type, status, reason, from, to, refresh, fetchAlerts])
 
   const handleMarkRead = async (alertId: string) => {
     try {
