@@ -9,6 +9,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useTheme, ThemeProvider } from '@/components/ui/theme-provider'
 import Head from 'next/head'
 import { FleetOSAnimatedBeams } from '@/components/magicui/fleetos-animated-beams'
+import { LineShadowText } from "@/components/magicui/line-shadow-text";
 
 // Simple scroll animation hook
 function useScrollReveal(ref: React.RefObject<HTMLElement>, options = { threshold: 0.1 }) {
@@ -80,7 +81,7 @@ function MainNav() {
         <div className="flex items-center gap-2">
           <MagicLogo size={32} />
           <span className="text-xl font-bold text-black dark:text-white">Fleet OS</span>
-          <Badge variant="secondary" className="text-xs ml-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700">AI SaaS</Badge>
+          <Badge variant="secondary" className="text-xs ml-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700">Bachman Inc.</Badge>
         </div>
         <div className="flex items-center gap-2">
           <div className="hidden md:flex items-center gap-2">
@@ -141,22 +142,94 @@ function MainNav() {
 
 // --- Hero Section ---
 function HeroSection() {
+  const theme = useTheme();
+
+
   const ref = useRef<HTMLElement>(null!);
   useScrollReveal(ref);
   return (
-    <section className="relative overflow-hidden bg-white py-12 md:py-20 flex flex-col items-center text-center border-b border-gray-100" data-reveal ref={ref}>
-      <div className="relative z-10 max-w-3xl mx-auto">
-        <h1 className="text-5xl md:text-6xl font-extrabold text-black mb-6 leading-tight drop-shadow-xl">AI Fleet Management.<br />24/7. No Humans Needed.</h1>
-        <p className="text-xl md:text-2xl text-gray-700 mb-8">The world&apos;s most advanced AI-powered fleet management system. Manage drivers, rides, and operations with zero human intervention.</p>
-        <div className="flex flex-col md:flex-row gap-4 justify-center mb-6">
-          <Link href="/pricing"><Button size="lg" className="bg-black text-white hover:bg-gray-900 text-lg font-bold px-8 py-4 focus:ring-2 focus:ring-blue-400 active:scale-95 transition">Get Started Free</Button></Link>
-          <Link href="/demo"><Button size="lg" variant="outline" className="text-lg font-bold px-8 py-4 border-gray-300 text-black focus:ring-2 focus:ring-blue-400 active:scale-95 transition">Book a Demo</Button></Link>
+    <section
+      className="relative overflow-hidden py-12 md:py-20 flex flex-col items-center text-center border-b border-gray-100"
+      data-reveal
+      ref={ref}
+    >
+      <div className="relative z-10 max-w-7xl mx-auto flex md:gap-0">
+        {/* Left: Text Content */}
+        <div className="w-full flex flex-col items-center md:items-start text-center md:text-left">
+        <h1 className="text-black dark:text-white text-5xl font-semibold leading-none tracking-tighter sm:text-6xl md:text-7xl lg:text-8xl">
+      Fleet
+      <LineShadowText className="italic text-black dark:text-white"  shadowColor='black'>
+        OS
+      </LineShadowText>
+    </h1>
+
+          <p className="text-xl text-gray-700 dark:text-gray-300 mb-8">
+            The all-in-one platform for modern fleet operations.<br />
+            Real-time insights. Automated workflows. Effortless control.<br />
+              <span className="font-semibold text-black dark:text-white">FleetOps</span>—where AI meets reliability.
+            </p>
+          <div className="flex flex-col md:flex-row gap-4 justify-center md:justify-start mb-6">
+            <Link href="/pricing">
+              <Button
+                size="lg"
+                className="bg-black dark:bg-white text-white dark:text-black text-lg font-bold px-8 py-4 shadow-lg"
+              >
+                Get Started Free
+              </Button>
+            </Link>
+            <Link href="/demo">
+              <Button
+                size="lg"
+                variant="outline"
+                className="text-lg font-bold px-8 py-4 border-gray-300 text-black dark:text-white shadow-lg"
+              >
+                Book a Demo
+              </Button>
+            </Link>
+          </div>
+          <div className="flex flex-wrap justify-center md:justify-start gap-4 text-gray-500 text-sm">
+            <span>Trusted by fleets in Dubai &amp; beyond</span>
+            <span className="flex items-center gap-1">
+              <Star className="h-4 w-4 text-gray-400" /> 4.9/5 rating
+            </span>
+          </div>
         </div>
-        <div className="flex flex-wrap justify-center gap-4 text-gray-500 text-sm">
-          <span>Trusted by leading fleets in Dubai &amp; beyond</span>
-          <span className="flex items-center gap-1"><Star className="h-4 w-4 text-gray-400" /> 4.9/5 average rating</span>
+        {/* Right: Cool Visual */}
+        <div className="w-full md:w-1/2 flex justify-center md:justify-end mt-12 md:mt-0">
+          <div className="relative flex items-center justify-center">
+            {/* Glowing gradient background */}
+            <div className="absolute -inset-6 rounded-3xl bg-gradient-to-tr from-blue-500/20 via-purple-400/20 to-pink-400/20 blur-2xl animate-pulse" />
+            {/* Animated Beams or Logo */}
+            <div className="relative z-10">
+              <FleetOSAnimatedBeams className="w-[350px] h-[350px] md:w-[420px] md:h-[420px]" />
+              {/* Optionally, add a floating badge or sparkle */}
+              <div className="absolute top-6 right-8 flex items-center gap-2 bg-white/80 dark:bg-black/80 px-4 py-2 rounded-full shadow-lg border border-gray-200 dark:border-gray-700 backdrop-blur-md animate-fadein">
+                <svg className="h-5 w-5 text-yellow-400 animate-spin-slow" fill="none" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" opacity="0.3" />
+                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" stroke="currentColor" strokeWidth="2" />
+                </svg>
+                <span className="font-semibold text-sm text-gray-800 dark:text-gray-100">AI Powered</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
+      <style jsx>{`
+        @keyframes spin-slow {
+          0% { transform: rotate(0deg);}
+          100% { transform: rotate(360deg);}
+        }
+        .animate-spin-slow {
+          animation: spin-slow 3s linear infinite;
+        }
+        @keyframes fadein {
+          from { opacity: 0; transform: translateY(-10px);}
+          to { opacity: 1; transform: translateY(0);}
+        }
+        .animate-fadein {
+          animation: fadein 0.8s cubic-bezier(0.4,0,0.2,1) both;
+        }
+      `}</style>
     </section>
   )
 }
@@ -202,10 +275,10 @@ export default function HomePage() {
       <div className="min-h-screen bg-white dark:bg-black flex flex-col transition-colors duration-300">
         <MainNav />
 
-        <HeroSection />
-        <div className="relative z-10"> 
 
-          <FleetOSAnimatedBeams />
+        <div className="relative z-10  border-b border-gray-200 shadow-sm dark:bg-gradient-to-r dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 dark:border-gray-700"> 
+        <HeroSection />
+
         </div>
 
         {/* Feature Grid Section */}
