@@ -43,7 +43,7 @@ export default function Hero() {
            animate={{ y: 0, opacity: 1 }}
            transition={{ delay: 0.5, duration: 0.8, ease: "easeOut" }}
          >
-           <Link href="/dashboard/drivers">
+           <Link href="/dashboard/command-center">
              <Button 
                className="group relative overflow-hidden bg-gradient-to-r  from-blue-600/5 via-purple-600/5 to-pink-600/5 text-white px-8 py-4 rounded-2xl font-semibold text-lg hover:text-black shadow-2xl hover:shadow-purple-500/25 transition-all duration-300 hover:scale-105 border-0"
              
