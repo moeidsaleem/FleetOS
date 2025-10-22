@@ -30,9 +30,7 @@ interface FleetStatus {
 export default function CommandCenterPage() {
   return (
     <RequireAuth>
-      <DashboardLayout>
-        <CommandCenter />
-      </DashboardLayout>
+      <CommandCenter />
     </RequireAuth>
   )
 }
@@ -55,6 +53,7 @@ function CommandCenter() {
     alerts: 0,
     avgPerformance: 0
   })
+  const [loading, setLoading] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -69,6 +68,37 @@ function CommandCenter() {
   useEffect(() => {
     // Focus input on mount
     inputRef.current?.focus()
+  }, [])
+
+  // Fetch fleet data
+  useEffect(() => {
+    const fetchFleetData = async () => {
+      try {
+        setLoading(true)
+        const response = await fetch('/api/drivers?limit=1000')
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success && data.data) {
+            const drivers = data.data
+            const activeDrivers = drivers.filter((d: any) => d.status === 'ACTIVE').length
+            const avgScore = drivers.reduce((sum: number, d: any) => sum + (d.currentScore || 0), 0) / drivers.length
+            
+            setFleetStatus({
+              totalDrivers: drivers.length,
+              activeDrivers: activeDrivers,
+              alerts: drivers.reduce((sum: number, d: any) => sum + (d.recentAlertsCount || 0), 0),
+              avgPerformance: Math.round(avgScore * 100) || 0
+            })
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch fleet data:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchFleetData()
   }, [])
 
   const handleSendMessage = async () => {
@@ -160,14 +190,18 @@ function CommandCenter() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Fleet Command Center</h1>
-              <p className="text-sm text-slate-600 dark:text-slate-400">AI-Powered Fleet Management</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Bachman Inc. • AI-Powered Fleet Management</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <Badge variant="outline" className="flex items-center gap-1">
               <CheckCircle className="w-3 h-3 text-green-500" />
               Online
             </Badge>
+            <div className="text-right">
+              <div className="text-sm font-medium text-slate-900 dark:text-white">Fleet Commander AI</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">v2.1.0</div>
+            </div>
           </div>
         </div>
       </div>
@@ -298,7 +332,10 @@ function CommandCenter() {
 
         {/* Sidebar */}
         <div className="w-80 border-l border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4">
-          <h3 className="font-semibold text-slate-900 dark:text-white mb-4">Fleet Overview</h3>
+          <div className="mb-4">
+            <h3 className="font-semibold text-slate-900 dark:text-white mb-1">Fleet Overview</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Bachman Inc. Fleet Operations</p>
+          </div>
           
           <div className="space-y-4">
             <Card>
@@ -309,18 +346,28 @@ function CommandCenter() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-600 dark:text-slate-400">Total Drivers</span>
-                  <span className="font-semibold">{fleetStatus.totalDrivers}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-600 dark:text-slate-400">Active</span>
-                  <span className="font-semibold text-green-600">{fleetStatus.activeDrivers}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-600 dark:text-slate-400">Alerts</span>
-                  <span className="font-semibold text-red-600">{fleetStatus.alerts}</span>
-                </div>
+                {loading ? (
+                  <div className="space-y-2">
+                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
+                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
+                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-600 dark:text-slate-400">Total Drivers</span>
+                      <span className="font-semibold">{fleetStatus.totalDrivers}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-600 dark:text-slate-400">Active</span>
+                      <span className="font-semibold text-green-600">{fleetStatus.activeDrivers}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-600 dark:text-slate-400">Alerts</span>
+                      <span className="font-semibold text-red-600">{fleetStatus.alerts}</span>
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
 
@@ -332,10 +379,17 @@ function CommandCenter() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">{fleetStatus.avgPerformance}%</div>
-                  <div className="text-xs text-slate-600 dark:text-slate-400">Average Score</div>
-                </div>
+                {loading ? (
+                  <div className="text-center">
+                    <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded animate-pulse mb-2" />
+                    <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded animate-pulse w-20 mx-auto" />
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-600">{fleetStatus.avgPerformance}%</div>
+                    <div className="text-xs text-slate-600 dark:text-slate-400">Average Score</div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -351,10 +405,45 @@ function CommandCenter() {
                   • System synced with Uber API
                 </div>
                 <div className="text-xs text-slate-600 dark:text-slate-400">
-                  • 3 new alerts processed
+                  • {fleetStatus.alerts} alerts processed
                 </div>
                 <div className="text-xs text-slate-600 dark:text-slate-400">
                   • Performance report generated
+                </div>
+                <div className="text-xs text-slate-600 dark:text-slate-400">
+                  • Command Center online
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Shield className="w-4 h-4" />
+                  System Status
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-600 dark:text-slate-400">Database</span>
+                  <Badge variant="outline" className="text-green-600 border-green-600">
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    Connected
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-600 dark:text-slate-400">Uber API</span>
+                  <Badge variant="outline" className="text-green-600 border-green-600">
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    Synced
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-600 dark:text-slate-400">AI Engine</span>
+                  <Badge variant="outline" className="text-green-600 border-green-600">
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    Active
+                  </Badge>
                 </div>
               </CardContent>
             </Card>
