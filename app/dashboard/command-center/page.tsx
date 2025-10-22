@@ -7,10 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Send, Bot, User, Zap, Shield, Activity, AlertTriangle, CheckCircle, Clock, MapPin } from 'lucide-react'
+import { Send, Bot, User, Zap, Shield, Activity, AlertTriangle, CheckCircle, Clock, MapPin, Sparkles } from 'lucide-react'
 import { RequireAuth } from '@/components/auth/require-auth'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useChat } from '@ai-sdk/react'
 
 interface Message {
   id: string
@@ -36,17 +37,6 @@ export default function CommandCenterPage() {
 }
 
 function CommandCenter() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      content: 'Welcome to Fleet Command Center! I\'m your AI Fleet Commander. How can I assist you with your fleet operations today?',
-      sender: 'ai',
-      timestamp: new Date(),
-      type: 'text'
-    }
-  ])
-  const [inputValue, setInputValue] = useState('')
-  const [isTyping, setIsTyping] = useState(false)
   const [fleetStatus, setFleetStatus] = useState<FleetStatus>({
     totalDrivers: 0,
     activeDrivers: 0,
@@ -56,6 +46,24 @@ function CommandCenter() {
   const [loading, setLoading] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Use Vercel AI SDK for chat
+  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
+    api: '/api/ai/chat',
+    initialMessages: [
+      {
+        id: '1',
+        role: 'assistant',
+        content: 'Welcome to Fleet Command Center! I\'m your AI Fleet Commander powered by advanced AI. How can I assist you with your fleet operations today?'
+      }
+    ],
+    body: {
+      fleetData: fleetStatus
+    }
+  })
+
+  // Ensure input is always a string to prevent undefined errors
+  const safeInput = input || ''
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -101,82 +109,16 @@ function CommandCenter() {
     fetchFleetData()
   }, [])
 
-  const handleSendMessage = async () => {
-    if (!inputValue.trim()) return
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      content: inputValue,
-      sender: 'user',
-      timestamp: new Date(),
-      type: 'text'
-    }
-
-    setMessages(prev => [...prev, userMessage])
-    setInputValue('')
-    setIsTyping(true)
-
-    // Simulate AI response
-    setTimeout(() => {
-      const aiResponse = generateAIResponse(inputValue)
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: aiResponse.content,
-        sender: 'ai',
-        timestamp: new Date(),
-        type: aiResponse.type || 'text'
-      }
-      setMessages(prev => [...prev, aiMessage])
-      setIsTyping(false)
-    }, 1500)
-  }
-
-  const generateAIResponse = (input: string): { content: string; type?: string } => {
-    const lowerInput = input.toLowerCase()
-    
-    if (lowerInput.includes('status') || lowerInput.includes('fleet')) {
-      return {
-        content: `🚀 **Fleet Status Report**\n\n📊 **Current Fleet Overview:**\n• Total Drivers: ${fleetStatus.totalDrivers}\n• Active Drivers: ${fleetStatus.activeDrivers}\n• Pending Alerts: ${fleetStatus.alerts}\n• Average Performance: ${fleetStatus.avgPerformance}%\n\nAll systems operational! ✅`,
-        type: 'status'
-      }
-    }
-    
-    if (lowerInput.includes('alert') || lowerInput.includes('warning')) {
-      return {
-        content: `🚨 **Alert Management**\n\nI can help you:\n• Send alerts to specific drivers\n• Check alert history\n• Monitor performance issues\n• Set up automated alerts\n\nWould you like me to send an alert to any drivers?`,
-        type: 'alert'
-      }
-    }
-    
-    if (lowerInput.includes('performance') || lowerInput.includes('score')) {
-      return {
-        content: `📈 **Performance Analysis**\n\nHere's what I can analyze:\n• Driver performance scores\n• Trip completion rates\n• Customer feedback trends\n• Efficiency metrics\n\nWould you like a detailed performance report?`,
-        type: 'command'
-      }
-    }
-    
-    if (lowerInput.includes('help') || lowerInput.includes('commands')) {
-      return {
-        content: `🤖 **Available Commands:**\n\n• **"Show fleet status"** - Get current fleet overview\n• **"Send alert to [driver]"** - Send alerts to drivers\n• **"Performance report"** - Get performance analytics\n• **"Driver details [name]"** - Get specific driver info\n• **"Sync with Uber"** - Sync latest data\n• **"Export data"** - Export fleet information\n\nTry any of these commands!`,
-        type: 'command'
-      }
-    }
-    
-    return {
-      content: `I understand you're asking about "${input}". I'm here to help manage your fleet operations. You can ask me about:\n\n• Fleet status and monitoring\n• Driver performance\n• Sending alerts\n• Data synchronization\n• Reports and analytics\n\nWhat would you like to know?`
-    }
-  }
-
   const quickActions = [
-    { label: 'Fleet Status', icon: Activity, command: 'Show fleet status' },
-    { label: 'Send Alert', icon: AlertTriangle, command: 'Send alert to driver' },
-    { label: 'Performance', icon: Zap, command: 'Performance report' },
-    { label: 'Sync Data', icon: Shield, command: 'Sync with Uber' }
+    { label: 'Fleet Status', icon: Activity, command: 'Show me the current fleet status and key metrics' },
+    { label: 'Send Alert', icon: AlertTriangle, command: 'Help me send an alert to a driver' },
+    { label: 'Performance', icon: Zap, command: 'Generate a performance report for my drivers' },
+    { label: 'Sync Data', icon: Shield, command: 'Sync the latest data from Uber API' }
   ]
 
   const handleQuickAction = (command: string) => {
-    setInputValue(command)
-    handleSendMessage()
+    handleInputChange({ target: { value: command } } as any)
+    handleSubmit({ preventDefault: () => {} } as any)
   }
 
   return (
@@ -189,8 +131,14 @@ function CommandCenter() {
               <Bot className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Fleet Command Center</h1>
-              <p className="text-sm text-slate-600 dark:text-slate-400">Bachman Inc. • AI-Powered Fleet Management</p>
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                Fleet Command Center
+                <Badge variant="outline" className="text-xs bg-gradient-to-r from-blue-100 to-purple-100 text-blue-700 border-blue-200">
+                  <Sparkles className="w-3 h-3 mr-1" />
+                  AI Powered
+                </Badge>
+              </h1>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Bachman Inc. • Advanced AI Fleet Management</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -219,9 +167,9 @@ function CommandCenter() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
-                    className={`flex gap-3 ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                    className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
-                    {message.sender === 'ai' && (
+                    {message.role === 'assistant' && (
                       <Avatar className="w-8 h-8">
                         <AvatarFallback className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
                           <Bot className="w-4 h-4" />
@@ -230,7 +178,7 @@ function CommandCenter() {
                     )}
                     
                     <Card className={`max-w-[80%] ${
-                      message.sender === 'user' 
+                      message.role === 'user' 
                         ? 'bg-blue-600 text-white' 
                         : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
                     }`}>
@@ -239,14 +187,14 @@ function CommandCenter() {
                           {message.content}
                         </div>
                         <div className={`text-xs mt-2 ${
-                          message.sender === 'user' ? 'text-blue-100' : 'text-slate-500'
+                          message.role === 'user' ? 'text-blue-100' : 'text-slate-500'
                         }`}>
-                          {message.timestamp.toLocaleTimeString()}
+                          {new Date().toLocaleTimeString()}
                         </div>
                       </CardContent>
                     </Card>
 
-                    {message.sender === 'user' && (
+                    {message.role === 'user' && (
                       <Avatar className="w-8 h-8">
                         <AvatarFallback className="bg-slate-600 text-white">
                           <User className="w-4 h-4" />
@@ -257,7 +205,7 @@ function CommandCenter() {
                 ))}
               </AnimatePresence>
 
-              {isTyping && (
+              {isLoading && (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -276,7 +224,7 @@ function CommandCenter() {
                           <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                           <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                         </div>
-                        <span className="text-sm text-slate-500">Fleet Commander is typing...</span>
+                        <span className="text-sm text-slate-500">Fleet Commander AI is thinking...</span>
                       </div>
                     </CardContent>
                   </Card>
@@ -309,24 +257,27 @@ function CommandCenter() {
 
           {/* Input Area */}
           <div className="border-t border-slate-200 dark:border-slate-700 p-4 bg-white dark:bg-slate-800">
-            <div className="max-w-4xl mx-auto flex gap-2">
+            <form onSubmit={handleSubmit} className="max-w-4xl mx-auto flex gap-2">
               <Input
                 ref={inputRef}
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                placeholder="Ask your Fleet Commander anything..."
+                value={safeInput}
+                onChange={handleInputChange}
+                placeholder="Ask your Fleet Commander AI anything..."
                 className="flex-1"
-                disabled={isTyping}
+                disabled={isLoading}
               />
               <Button 
-                onClick={handleSendMessage}
-                disabled={!inputValue.trim() || isTyping}
+                type="submit"
+                disabled={!safeInput.trim() || isLoading}
                 className="bg-blue-600 hover:bg-blue-700"
               >
-                <Send className="w-4 h-4" />
+                {isLoading ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
               </Button>
-            </div>
+            </form>
           </div>
         </div>
 
