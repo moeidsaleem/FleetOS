@@ -11,7 +11,6 @@ import { Send, Bot, User, Zap, Shield, Activity, AlertTriangle, CheckCircle, Clo
 import { RequireAuth } from '@/components/auth/require-auth'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useChat } from '@ai-sdk/react'
 
 interface Message {
   id: string
@@ -47,23 +46,74 @@ function CommandCenter() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Use Vercel AI SDK for chat
-  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
-    api: '/api/ai/chat',
-    initialMessages: [
-      {
-        id: '1',
-        role: 'assistant',
-        content: 'Welcome to Fleet Command Center! I\'m your AI Fleet Commander powered by advanced AI. How can I assist you with your fleet operations today?'
-      }
-    ],
-    body: {
-      fleetData: fleetStatus
+  // Chat state management
+  const [input, setInput] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [messages, setMessages] = useState([
+    {
+      id: '1',
+      role: 'assistant' as const,
+      content: 'Welcome to Fleet Command Center! I\'m your AI Fleet Commander powered by advanced AI. How can I assist you with your fleet operations today?'
     }
-  })
+  ])
 
-  // Ensure input is always a string to prevent undefined errors
-  const safeInput = input || ''
+  // Handle input change
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInput(e.target.value)
+  }
+
+  // Handle form submission
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!input.trim() || isLoading) return
+
+    const userMessage = {
+      id: Date.now().toString(),
+      role: 'user' as const,
+      content: input
+    }
+
+    setMessages(prev => [...prev, userMessage])
+    setInput('')
+    setIsLoading(true)
+
+    try {
+      const response = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [...messages, userMessage],
+          fleetData: fleetStatus
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to get AI response')
+      }
+
+      const data = await response.json()
+      
+      const aiMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant' as const,
+        content: data.message || 'I apologize, but I couldn\'t process your request at the moment.'
+      }
+
+      setMessages(prev => [...prev, aiMessage])
+    } catch (error) {
+      console.error('Error getting AI response:', error)
+      const errorMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant' as const,
+        content: 'I apologize, but I encountered an error. Please try again.'
+      }
+      setMessages(prev => [...prev, errorMessage])
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -117,8 +167,14 @@ function CommandCenter() {
   ]
 
   const handleQuickAction = (command: string) => {
-    handleInputChange({ target: { value: command } } as any)
-    handleSubmit({ preventDefault: () => {} } as any)
+    setInput(command)
+    // Auto-submit after setting the input
+    setTimeout(() => {
+      const form = document.querySelector('form')
+      if (form) {
+        form.requestSubmit()
+      }
+    }, 100)
   }
 
   return (
@@ -260,7 +316,7 @@ function CommandCenter() {
             <form onSubmit={handleSubmit} className="max-w-4xl mx-auto flex gap-2">
               <Input
                 ref={inputRef}
-                value={safeInput}
+                value={input}
                 onChange={handleInputChange}
                 placeholder="Ask your Fleet Commander AI anything..."
                 className="flex-1"
@@ -268,7 +324,7 @@ function CommandCenter() {
               />
               <Button 
                 type="submit"
-                disabled={!safeInput.trim() || isLoading}
+                disabled={!input.trim() || isLoading}
                 className="bg-blue-600 hover:bg-blue-700"
               >
                 {isLoading ? (
