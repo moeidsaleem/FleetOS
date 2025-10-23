@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Button } from '../../../components/ui/button'
 import { Input } from '../../../components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select'
@@ -78,6 +78,10 @@ function DriversPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [gradeFilter, setGradeFilter] = useState<string>('all')
   const [languageFilter, setLanguageFilter] = useState<string>('all')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalDrivers, setTotalDrivers] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
+  const driversPerPage = 50
   const { toast } = useToast()
   const [alertCallModal, setAlertCallModal] = useState<{
     open: boolean
@@ -97,7 +101,7 @@ function DriversPage() {
   // Debounce search term
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
 
-  const fetchDrivers = useCallback(async (syncFromUber = false) => {
+  const fetchDrivers = useCallback(async (syncFromUber = false, page = 1, append = false) => {
     try {
       setLoading(true)
       setError(null)
@@ -109,8 +113,8 @@ function DriversPage() {
         })
       }
       
-      // Always fetch only drivers, not alerts
-      const url = `/api/drivers?limit=1000`
+      const offset = (page - 1) * driversPerPage
+      const url = `/api/drivers?limit=${driversPerPage}&offset=${offset}`
       console.log('Fetching drivers from:', url)
       
       const response = await fetch(url)
@@ -163,7 +167,15 @@ function DriversPage() {
 
       console.log('Processed drivers:', driversWithMetrics)
       
-      setDrivers(driversWithMetrics)
+      if (append) {
+        setDrivers(prev => [...prev, ...driversWithMetrics])
+      } else {
+        setDrivers(driversWithMetrics)
+      }
+      
+      // Update pagination state
+      setHasMore(driversWithMetrics.length === driversPerPage)
+      setTotalDrivers(prev => append ? prev + driversWithMetrics.length : driversWithMetrics.length)
       
       if (syncFromUber) {
         toast({
@@ -182,7 +194,7 @@ function DriversPage() {
     } finally {
       setLoading(false)
     }
-  }, [toast])
+  }, [toast, driversPerPage])
 
   useEffect(() => {
     fetchDrivers()
@@ -195,16 +207,19 @@ function DriversPage() {
     return 'destructive'
   }
 
-  const filteredDrivers = drivers.filter(driver => {
-    const matchesSearch = (driver.name && driver.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase())) ||
-                         (driver.phoneNumber && driver.phoneNumber.includes(debouncedSearchTerm)) ||
-                         (driver.uberDriverId && driver.uberDriverId.toLowerCase().includes(debouncedSearchTerm.toLowerCase()))
-    const matchesStatus = statusFilter === 'all' || driver.status === statusFilter
-    const matchesGrade = gradeFilter === 'all' || driver.lastMetrics?.grade === gradeFilter
-    const matchesLanguage = languageFilter === 'all' || driver.language === languageFilter
-    
-    return matchesSearch && matchesStatus && matchesGrade && matchesLanguage
-  })
+  // Memoize filtered drivers to avoid recalculating on every render
+  const filteredDrivers = useMemo(() => {
+    return drivers.filter(driver => {
+      const matchesSearch = (driver.name && driver.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase())) ||
+                           (driver.phoneNumber && driver.phoneNumber.includes(debouncedSearchTerm)) ||
+                           (driver.uberDriverId && driver.uberDriverId.toLowerCase().includes(debouncedSearchTerm.toLowerCase()))
+      const matchesStatus = statusFilter === 'all' || driver.status === statusFilter
+      const matchesGrade = gradeFilter === 'all' || driver.lastMetrics?.grade === gradeFilter
+      const matchesLanguage = languageFilter === 'all' || driver.language === languageFilter
+      
+      return matchesSearch && matchesStatus && matchesGrade && matchesLanguage
+    })
+  }, [drivers, debouncedSearchTerm, statusFilter, gradeFilter, languageFilter])
 
   // Export handler (now implemented)
   const handleExport = async () => {
@@ -310,7 +325,14 @@ function DriversPage() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
           <h1 className="text-4xl font-extrabold text-black drop-shadow-lg dark:text-white tracking-tight mb-1">Drivers</h1>
-          <p className="text-muted-foreground text-lg">Manage your fleet drivers, performance, and alerts.</p>
+          <p className="text-muted-foreground text-lg">
+            Manage your fleet drivers, performance, and alerts.
+            {drivers.length > 0 && (
+              <span className="ml-2 text-sm font-medium text-blue-600 dark:text-blue-400">
+                ({filteredDrivers.length} of {drivers.length} drivers)
+              </span>
+            )}
+          </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
           <Input
@@ -392,7 +414,7 @@ function DriversPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {loading ? (
+            {loading && drivers.length === 0 ? (
               Array.from({ length: 8 }).map((_, i) => (
                 <TableRow key={i} className="animate-pulse">
                   <TableCell className="px-6 py-4"><div className="h-4 bg-muted rounded w-3/4" /></TableCell>
@@ -458,6 +480,34 @@ function DriversPage() {
           </TableBody>
         </Table>
       </div>
+      
+      {/* Load More Button */}
+      {hasMore && !loading && (
+        <div className="flex justify-center mt-6">
+          <Button 
+            onClick={() => {
+              const nextPage = currentPage + 1
+              setCurrentPage(nextPage)
+              fetchDrivers(false, nextPage, true)
+            }}
+            variant="outline"
+            className="px-8 py-2"
+          >
+            Load More Drivers
+          </Button>
+        </div>
+      )}
+      
+      {/* Loading indicator for pagination */}
+      {loading && drivers.length > 0 && (
+        <div className="flex justify-center mt-4">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <RefreshCw className="h-4 w-4 animate-spin" />
+            Loading more drivers...
+          </div>
+        </div>
+      )}
+      
       {/* Restore AlertCallModal at the bottom */}
       {alertCallModal.driver && (
         <AlertCallModal

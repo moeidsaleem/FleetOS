@@ -40,23 +40,33 @@ export async function GET(request: NextRequest) {
 
     // If no alert filters are present, return all drivers with performance and alert data
     if (!driverId && !type && !status && !reason && !from && !to) {
-      const drivers = await prisma.driver.findMany({})
-      // For each driver, fetch latest metric and alert count
-      const driverData = await Promise.all(drivers.map(async (driver) => {
-        // Latest metric
-        const lastMetric = await prisma.driverMetrics.findFirst({
-          where: { driverId: driver.id },
-          orderBy: { date: 'desc' }
-        })
-        // Alert count
-        const recentAlertsCount = await prisma.alertRecord.count({
-          where: { driverId: driver.id }
-        })
+      // Use a single query with includes to fetch all data at once
+      const drivers = await prisma.driver.findMany({
+        include: {
+          metrics: {
+            orderBy: { date: 'desc' },
+            take: 1 // Only get the latest metric
+          },
+          alerts: {
+            select: { id: true } // Only count alerts, don't fetch full data
+          }
+        },
+        orderBy: { joinedAt: 'desc' },
+        take: limit,
+        skip: offset
+      })
+
+      // Process the data efficiently
+      const driverData = drivers.map((driver) => {
+        const lastMetric = driver.metrics[0] // Get the latest metric
+        const recentAlertsCount = driver.alerts.length // Count alerts
+        
         // Calculate grade from calculatedScore
         let grade = null
         if (lastMetric && typeof lastMetric.calculatedScore === 'number') {
           grade = getGradeFromScore(lastMetric.calculatedScore)
         }
+
         return {
           ...driver,
           lastMetrics: lastMetric ? {
@@ -70,9 +80,13 @@ export async function GET(request: NextRequest) {
             grade
           } : null,
           currentScore: lastMetric ? lastMetric.calculatedScore : null,
-          recentAlertsCount
+          recentAlertsCount,
+          // Remove the included relations to avoid circular references
+          metrics: undefined,
+          alerts: undefined
         }
-      }))
+      })
+
       return NextResponse.json({ success: true, data: driverData })
     }
 

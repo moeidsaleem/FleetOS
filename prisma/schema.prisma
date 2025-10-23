@@ -30,6 +30,9 @@ model Driver {
   driverDocuments DriverDocument[]
   driverNotes     DriverNote[]
   
+  @@index([status])
+  @@index([joinedAt])
+  @@index([language])
   @@map("drivers")
 }
 
@@ -51,6 +54,8 @@ model DriverMetrics {
   driver           Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
 
   @@unique([driverId, date])
+  @@index([driverId, date])
+  @@index([calculatedScore])
   @@map("driver_metrics")
 }
 
