@@ -91,9 +91,8 @@ function MainNav() {
               </a>
             ))}
             <Link href="/login"><Button variant="outline" className="border-gray-300 dark:border-gray-700 text-black dark:text-white">Login</Button></Link>
-            <Link href="/signup"><Button variant="outline" className="border-gray-300 dark:border-gray-700 text-black dark:text-white">Sign Up</Button></Link>
             <Link href="/demo"><Button variant="outline" className="border-gray-300 dark:border-gray-700 text-black dark:text-white">Book a Demo</Button></Link>
-            <Link href="/pricing"><Button className="bg-black dark:bg-white text-white dark:text-black hover:bg-gray-900 dark:hover:bg-gray-100">Get Started Free</Button></Link>
+            <Link href="/signup"><Button className="bg-black dark:bg-white text-white dark:text-black hover:bg-gray-900 dark:hover:bg-gray-100">Get Started Free</Button></Link>
           </div>
           <div className="md:hidden">
             <Button variant="ghost" size="icon" onClick={() => setMobileOpen(v => !v)} aria-label="Open menu">
@@ -125,7 +124,7 @@ function MainNav() {
               <Link href="/signup" className="py-2" onClick={() => setMobileOpen(false)}><Button variant="outline" className="w-full border-gray-300 dark:border-gray-700 text-black dark:text-white">Sign Up</Button></Link>
               <Link href="/demo" className="py-2" onClick={() => setMobileOpen(false)}><Button variant="outline" className="w-full border-gray-300 dark:border-gray-700 text-black dark:text-white">Book a Demo</Button></Link>
               <div className="flex items-center gap-2 mt-2">
-                <Link href="/pricing" className="py-2" onClick={() => setMobileOpen(false)}><Button className="w-full bg-black dark:bg-white text-white dark:text-black hover:bg-gray-900 dark:hover:bg-gray-100">Get Started Free</Button></Link>
+                <Link href="/signup" className="py-2" onClick={() => setMobileOpen(false)}><Button className="w-full bg-black dark:bg-white text-white dark:text-black hover:bg-gray-900 dark:hover:bg-gray-100">Get Started Free</Button></Link>
               </div>
             </div>
           </div>

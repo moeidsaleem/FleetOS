@@ -323,7 +323,7 @@ function CommandCenter() {
                     variant="outline"
                     size="sm"
                     onClick={() => handleQuickAction(action.command)}
-                    className="flex items-center gap-2"
+                    className="flex items-center gap-2 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700"
                   >
                     <action.icon className="w-4 h-4" />
                     {action.label}
