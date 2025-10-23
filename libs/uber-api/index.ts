@@ -11,10 +11,11 @@ const HARDCODED_UBER_SCOPE = "solutions.suppliers.drivers.status.read solutions.
 const HARDCODED_UBER_ORG_ID = "8Ecn5uogQt_k3ii01cAnN7JgsMktSs5Nywf-7UGnopC67mwxp1J0JXGG-NK9JTPcleWYaKOfxFvX6ZJydPM-HihAhU8hpkdzyYvrfrQkkjOGmzZOt9dyZ1HtPO-UbykipQ=="
 
 async function fetchUberAccessToken(): Promise<string> {
-  // Use hardcoded values for local/dev
-  const clientId = HARDCODED_UBER_CLIENT_ID
-  const clientSecret = HARDCODED_UBER_CLIENT_SECRET
-  const scope = HARDCODED_UBER_SCOPE
+  // Use environment variables first, fallback to hardcoded for development
+  const clientId = process.env.UBER_CLIENT_ID || HARDCODED_UBER_CLIENT_ID
+  const clientSecret = process.env.UBER_CLIENT_SECRET || HARDCODED_UBER_CLIENT_SECRET
+  const scope = process.env.UBER_SCOPE || HARDCODED_UBER_SCOPE
+  
   if (!clientId || !clientSecret || !scope) {
     throw new Error('UBER_CLIENT_ID, UBER_CLIENT_SECRET, and UBER_SCOPE must be set in environment variables')
   }
@@ -70,7 +71,7 @@ export class UberFleetAPI {
     const client = await this.getClient()
     // Use hardcoded org ID if not provided
     const response = await client.get(`/vehicle-suppliers/drivers`, {
-      params: { org_id: orgId || HARDCODED_UBER_ORG_ID },
+      params: { org_id: orgId || process.env.UBER_ORGANIZATION_ID || HARDCODED_UBER_ORG_ID },
     })
     // Uber API returns driverInformation array
     return response.data.driverInformation || []
@@ -82,7 +83,7 @@ export class UberFleetAPI {
   async getDriver(driverId: string): Promise<any> {
     const client = await this.getClient()
     // Use hardcoded org ID
-    const orgId = HARDCODED_UBER_ORG_ID
+    const orgId = process.env.UBER_ORGANIZATION_ID || HARDCODED_UBER_ORG_ID
     if (!orgId) throw new Error('UBER_ORG_ID must be set in env')
     const response = await client.get(`/vehicle-suppliers/drivers/${driverId}`, {
       params: { org_id: orgId },
@@ -119,7 +120,7 @@ export class UberFleetAPI {
    */
   async getTripsForDriver(driverUuid: string, startDate?: Date, endDate?: Date): Promise<any[]> {
     // Use hardcoded org ID
-    const orgId = HARDCODED_UBER_ORG_ID
+    const orgId = process.env.UBER_ORGANIZATION_ID || HARDCODED_UBER_ORG_ID
     if (!orgId) throw new Error('UBER_ORG_ID must be set in env')
     const params: Record<string, any> = {}
     if (startDate) params.start_time = startDate.toISOString()
@@ -178,7 +179,7 @@ export class UberFleetAPI {
     const client = await this.getClient()
     const response = await client.get(`/vehicle-suppliers/drivers/actions`, {
       params: {
-        org_id: orgId || HARDCODED_UBER_ORG_ID,
+        org_id: orgId || process.env.UBER_ORGANIZATION_ID || HARDCODED_UBER_ORG_ID,
         page_size: pageSize,
       },
     })
@@ -191,7 +192,7 @@ export class UberFleetAPI {
    */
   async getOrganization(orgId?: string): Promise<{ id: string; name: string }> {
     const client = await this.getClient()
-    const id = orgId || HARDCODED_UBER_ORG_ID
+    const id = orgId || process.env.UBER_ORGANIZATION_ID || HARDCODED_UBER_ORG_ID
     if (!id) throw new Error('UBER_ORG_ID must be set in env')
     const response = await client.get(`/vehicle-suppliers/organizations/${id}`)
     // Uber API returns org info with id and name
@@ -313,7 +314,7 @@ export class UberFleetAPI {
   // Create report download URL
   async createReportDownloadUrl(reportId: string): Promise<{ download_url: string }> {
     const accessToken = await fetchUberAccessToken();
-    const url = `${this.baseURL}/v1/organizations/${this.organizationId}/reports/${reportId}/download`;
+    const url = `${this.baseURL}/v1/organizations/${process.env.UBER_ORGANIZATION_ID || HARDCODED_UBER_ORG_ID}/reports/${reportId}/download`;
     
     const res = await fetch(url, {
       method: "POST",
@@ -330,7 +331,7 @@ export class UberFleetAPI {
   // Get report by ID
   async getReportById(reportId: string): Promise<any> {
     const accessToken = await fetchUberAccessToken();
-    const url = `${this.baseURL}/v1/organizations/${this.organizationId}/reports/${reportId}`;
+    const url = `${this.baseURL}/v1/organizations/${process.env.UBER_ORGANIZATION_ID || HARDCODED_UBER_ORG_ID}/reports/${reportId}`;
     
     const res = await fetch(url, {
       method: "GET",

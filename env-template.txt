@@ -16,4 +16,10 @@ ELEVENLABS_AGENT_PHONE_NUMBER_ID=your_phone_number_id_here
 # NEXTAUTH_URL="http://localhost:3000"
 
 # OpenAI API (for AI Command Center)
-# OPENAI_API_KEY="your_openai_api_key_here" 
+# OPENAI_API_KEY="your_openai_api_key_here"
+
+# Uber Fleet API Credentials
+# UBER_CLIENT_ID="your_uber_client_id_here"
+# UBER_CLIENT_SECRET="your_uber_client_secret_here"
+# UBER_ORGANIZATION_ID="your_uber_organization_id_here"
+# UBER_SCOPE="solutions.suppliers.drivers.status.read solutions.suppliers.reports supplier.partner.payments vehicle_suppliers.vehicles.read vehicle_suppliers.vehicles.write solutions.suppliers.metrics.read vehicle_suppliers.organizations.read" 
