@@ -23,7 +23,14 @@ async function fetchUberAccessToken(): Promise<string> {
   params.append('client_id', clientId)
   params.append('client_secret', clientSecret)
   params.append('grant_type', 'client_credentials')
-  params.append('scope', scope)
+  params.append('scope', scope.trim()) // Remove any whitespace/newlines
+
+  console.log('Uber OAuth Request:', {
+    url: 'https://auth.uber.com/oauth/v2/token',
+    client_id: clientId,
+    grant_type: 'client_credentials',
+    scope: scope.trim()
+  })
 
   const response = await axios.post('https://auth.uber.com/oauth/v2/token', params, {
     headers: {
@@ -96,10 +103,27 @@ export class UberFleetAPI {
    * Analytics data query (performance reports)
    */
   async analyticsDataQuery(body: any): Promise<any> {
-    const client = await this.getClient()
-    const response = await client.post(`/vehicle-suppliers/analytics-data/query`, body)
-    console.log('Uber API analyticsDataQuery response:', response.data)
-    return response.data
+    const accessToken = await getUberAccessToken()
+    try {
+      console.log('Uber Analytics Query Request:', JSON.stringify(body, null, 2))
+      const response = await axios.post(`${this.baseURL}/vehicle-suppliers/analytics-data/query`, body, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      console.log('Uber API analyticsDataQuery response:', response.data)
+      return response.data
+    } catch (error: any) {
+      console.error('Uber Analytics Query Error:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        url: error.config?.url,
+        method: error.config?.method
+      })
+      throw error
+    }
   }
 
   /**
@@ -224,8 +248,8 @@ export class UberFleetAPI {
    * Deprecated: Use listTrips for all trips
    */
   async getTrips(startDate?: Date, endDate?: Date): Promise<any[]> {
-    const orgId = process.env.UBER_ORG_ID
-    if (!orgId) throw new Error('UBER_ORG_ID must be set in env')
+    const orgId = process.env.UBER_ORGANIZATION_ID || HARDCODED_UBER_ORG_ID
+    if (!orgId) throw new Error('UBER_ORGANIZATION_ID must be set in env')
 
     const drivers = await this.listDrivers(orgId)
     if (!drivers || drivers.length === 0) {
@@ -265,7 +289,7 @@ export class UberFleetAPI {
   }
 
   async fetchDriverAnalytics(driverUuids: string[], start: number, end: number) {
-    const orgId = process.env.UBER_ORG_ID;
+    const orgId = process.env.UBER_ORGANIZATION_ID || HARDCODED_UBER_ORG_ID;
     const accessToken = await getUberAccessToken();
     const url = `${this.baseURL}/vehicle-suppliers/analytics-data/query`;
 

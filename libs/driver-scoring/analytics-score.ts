@@ -15,10 +15,10 @@ export interface AnalyticsScoreConfig {
 }
 
 export const defaultAnalyticsScoreConfig: AnalyticsScoreConfig = {
-  tripRate: { min: 0.1, weight: 30 },
-  activeRatio: { min: 0.05, weight: 30 },
-  trips: { min: 5, weight: 20 },
-  earnings: { min: 250, weight: 20 }
+  tripRate: { min: 0.5, weight: 30 },       // 0.5 trips per hour is reasonable
+  activeRatio: { min: 0.3, weight: 30 },    // 30% active time is reasonable
+  trips: { min: 10, weight: 20 },           // 10 trips per day is reasonable
+  earnings: { min: 100, weight: 20 }        // $100 per day is reasonable
 };
 
 export function scoreDriverFromAnalytics(
@@ -29,11 +29,14 @@ export function scoreDriverFromAnalytics(
   const tripRate = hoursOnline > 0 ? trips / hoursOnline : 0;
   const activeRatio = hoursOnline > 0 ? hoursOnTrip / hoursOnline : 0;
 
-  let score = 0;
-  if (tripRate >= config.tripRate.min) score += config.tripRate.weight;
-  if (activeRatio >= config.activeRatio.min) score += config.activeRatio.weight;
-  if (trips >= config.trips.min) score += config.trips.weight;
-  if (earnings >= config.earnings.min) score += config.earnings.weight;
+  // Calculate graduated scores instead of all-or-nothing
+  const tripRateScore = Math.min(1, tripRate / config.tripRate.min) * config.tripRate.weight;
+  const activeRatioScore = Math.min(1, activeRatio / config.activeRatio.min) * config.activeRatio.weight;
+  const tripsScore = Math.min(1, trips / config.trips.min) * config.trips.weight;
+  const earningsScore = Math.min(1, earnings / config.earnings.min) * config.earnings.weight;
 
-  return score;
+  const totalScore = tripRateScore + activeRatioScore + tripsScore + earningsScore;
+
+  // Ensure score is between 0 and 100
+  return Math.max(0, Math.min(100, totalScore));
 } 

@@ -42,9 +42,9 @@ export class UberSyncService {
     try {
       console.log('Starting Uber Fleet API sync (OAuth)...')
       const uberAPI = getUberAPI()
-      const orgId = process.env.UBER_ORG_ID
+      const orgId = process.env.UBER_ORGANIZATION_ID
       if (!orgId) {
-        const errorMsg = 'UBER_ORG_ID must be set in environment variables.'
+        const errorMsg = 'UBER_ORGANIZATION_ID must be set in environment variables.'
         console.error(errorMsg)
         result.errors.push(errorMsg)
         status = 'FAILURE'
@@ -91,7 +91,7 @@ export class UberSyncService {
         const driverUuids = drivers.map(d => d.uberDriverId)
         const uberAPI = getUberAPI()
         const nowMs = Date.now()
-        const thirtyDaysAgo = nowMs - 30 * 24 * 60 * 60 * 1000
+        const sevenDaysAgo = nowMs - 7 * 24 * 60 * 60 * 1000
         const batchSize = 50
         // Load config from SystemConfig if available
         let analyticsScoreConfig: AnalyticsScoreConfig = defaultAnalyticsScoreConfig
@@ -101,49 +101,58 @@ export class UberSyncService {
             analyticsScoreConfig = configRow.value as unknown as AnalyticsScoreConfig
           }
         } catch {}
-        for (let i = 0; i < driverUuids.length; i += batchSize) {
-          const batch = driverUuids.slice(i, i + batchSize)
-          // Query Uber API for daily breakdown (add vs:date dimension)
-          const analyticsResponse = await uberAPI.analyticsDataQuery({
-            reportRequests: [
-              {
-                timeRanges: [{ startsAt: thirtyDaysAgo, endsAt: nowMs }],
-                dimensions: [
-                  { name: "vs:driver" },
-                  { name: "vs:date" }
-                ],
-                metrics: [
-                  { expression: "vs:HoursOnline" },
-                  { expression: "vs:HoursOnTrip" },
-                  { expression: "vs:TotalTrips" },
-                  { expression: "vs:TotalEarnings" }
-                ],
-                dimension_filter_clauses: [
-                  {
-                    operator: "FILTER_LOGICAL_OPERATOR_AND",
-                    filters: [
-                      {
-                        dimension_name: "vs:driver",
-                        operator: "OPERATOR_IN",
-                        expressions: batch
-                      }
-                    ]
+        try {
+          for (let i = 0; i < driverUuids.length; i += batchSize) {
+            const batch = driverUuids.slice(i, i + batchSize)
+            console.log(`[SYNC] Fetching analytics for batch ${i / batchSize + 1}/${Math.ceil(driverUuids.length / batchSize)} (${batch.length} drivers)`)
+            // Query Uber API for daily breakdown (add vs:date dimension)
+            const analyticsResponse = await uberAPI.analyticsDataQuery({
+              reportRequests: [
+                {
+                  timeRanges: [
+                    {
+                      startsAt: sevenDaysAgo,
+                      endsAt: nowMs
+                    }
+                  ],
+                  dimensions: [
+                    {
+                      name: "vs:driver"
+                    }
+                  ],
+                  metrics: [
+                    { expression: "vs:HoursOnline" },
+                    { expression: "vs:HoursOnTrip" },
+                    { expression: "vs:TotalTrips" },
+                    { expression: "vs:TotalEarnings" }
+                  ],
+                  dimension_filter_clauses: [
+                    {
+                      operator: "FILTER_LOGICAL_OPERATOR_AND",
+                      filters: [
+                        {
+                          dimension_name: "vs:driver",
+                          operator: "OPERATOR_IN",
+                          expressions: batch
+                        }
+                      ]
+                    }
+                  ],
+                  pagination_options: {
+                    pageSize: 50
                   }
-                ],
-                pagination_options: { pageSize: 50 }
+                }
+              ],
+              orgId: {
+                orgUuid: process.env.UBER_ORGANIZATION_ID
               }
-            ],
-            orgId: { orgUuid: process.env.UBER_ORG_ID }
-          })
+            })
           const rows = analyticsResponse.reports?.[0]?.data?.timeRangeData?.[0]?.rows || []
           for (const row of rows) {
             const driverId = row.dimensionId as string
-            // If Uber returns date as a dimension value, use it
-            const dateIdx = row.dimensionValues?.findIndex((v: any) => /\d{4}-\d{2}-\d{2}/.test(v))
-            let date = new Date(nowMs)
-            if (dateIdx !== -1 && row.dimensionValues && row.dimensionValues[dateIdx]) {
-              date = new Date(row.dimensionValues[dateIdx])
-            }
+            // Use today's date since we're getting aggregated data for the time range
+            const date = new Date()
+            date.setHours(0, 0, 0, 0) // Start of day
             const [hoursOnline, hoursOnTrip, trips, earnings] = row.metricValues.map(parseFloat)
             const metrics: AnalyticsMetrics = { hoursOnline, hoursOnTrip, trips, earnings }
             const score = scoreDriverFromAnalytics(metrics, analyticsScoreConfig)
@@ -155,7 +164,7 @@ export class UberSyncService {
               where: {
                 driverId_date: {
                   driverId: localDriver.id,
-                  date: new Date(date.toISOString().split('T')[0])
+                  date: date
                 }
               },
               update: {
@@ -182,6 +191,11 @@ export class UberSyncService {
               }
             })
           }
+        }
+        } catch (analyticsError) {
+          console.error('[SYNC] Analytics scoring failed:', analyticsError)
+          // Don't set fake scores - let drivers have no analytics data if API fails
+          console.log('[SYNC] Analytics API failed - drivers will not have performance scores until API is fixed')
         }
         // --- ADVANCED ALERTING CONTROLS ---
         // Load alerting config from SystemConfig
