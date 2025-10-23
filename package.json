@@ -10,7 +10,7 @@
     "setup:elevenlabs": "tsx scripts/setup-elevenlabs-agent.ts",
     "check:elevenlabs": "tsx scripts/check-elevenlabs-config.ts",
     "test:enhanced-call": "tsx scripts/test-enhanced-call.ts",
-    "prisma:reset": "prisma migrate reset",
+    "prisma:reset": "prisma migrate reset --force",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "prisma:generate": "prisma generate",

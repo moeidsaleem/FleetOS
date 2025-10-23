@@ -114,12 +114,12 @@ const menuItems = [
   {
     title: 'System',
     items: [
-      {
-        title: 'Uber Integration',
-        href: '/dashboard/uber',
-        icon: Database,
-        description: 'Fleet API management'
-      },
+      // {
+      //   title: 'Uber Integration',
+      //   href: '/dashboard/uber',
+      //   icon: Database,
+      //   description: 'Fleet API management'
+      // },
       {
         title: 'Settings',
         href: '/dashboard/settings',
