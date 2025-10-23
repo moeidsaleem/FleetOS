@@ -35,7 +35,7 @@ export default function Hero() {
         </OrbitingCircles> */}
       </div>
       <div className="relative z-10 max-w-3xl text-center space-y-8"> 
-        <h1 className="text-4xl font-bold text-white"> 
+        <h1 className="text-4xl font-bold text-black dark:text-white"> 
           Welcome to Fleet OS 
         </h1>
          <motion.div
@@ -45,7 +45,7 @@ export default function Hero() {
          >
            <Link href="/dashboard/command-center">
              <Button 
-               className="group relative overflow-hidden bg-gradient-to-r  from-blue-600/5 via-purple-600/5 to-pink-600/5 text-white px-8 py-4 rounded-2xl font-semibold text-lg hover:text-black shadow-2xl hover:shadow-purple-500/25 transition-all duration-300 hover:scale-105 border-0"
+               className="group relative overflow-hidden bg-gradient-to-r  from-blue-600/5 via-purple-600/5 to-pink-600/5 text-black dark:text-white px-8 py-4 rounded-2xl font-semibold text-lg hover:text-white dark:hover:text-black shadow-2xl hover:shadow-purple-500/25 transition-all duration-300 hover:scale-105 border-0"
              
              >
                <motion.div
@@ -59,8 +59,8 @@ export default function Hero() {
                    animate={{ rotate: 360 }}
                    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
                  >
-                   <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center">
-                     <ArrowRightIcon className="w-4 h-4 text-white" />
+                   <div className="w-6 h-6 rounded-full bg-black/20 dark:bg-white/20 flex items-center justify-center">
+                     <ArrowRightIcon className="w-4 h-4 text-black dark:text-white" />
                    </div>
                  </motion.div>
                  Summon Fleet Commander

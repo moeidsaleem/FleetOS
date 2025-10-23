@@ -21,7 +21,7 @@ export default function MagicLogo({ size = 40, className }: { size?: number, cla
         </linearGradient>
       </defs>
       {/* Stylized steering wheel with a crown */}
-      <circle cx="32" cy="32" r="28" stroke="url(#magic-gradient)" strokeWidth="6" fill="white" />
+      <circle cx="32" cy="32" r="28" stroke="url(#magic-gradient)" strokeWidth="6" fill="currentColor" />
       <path d="M20 44c4-8 20-8 24 0" stroke="url(#magic-gradient)" strokeWidth="4" strokeLinecap="round" fill="none" />
       <circle cx="32" cy="32" r="8" stroke="url(#magic-gradient)" strokeWidth="3" fill="none" />
       {/* Crown */}

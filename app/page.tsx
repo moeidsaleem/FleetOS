@@ -182,7 +182,7 @@ function HeroSection() {
               <Button
                 size="lg"
                 variant="outline"
-                className="text-lg font-bold px-8 py-4 border-gray-300 text-black dark:text-white shadow-lg"
+                className="text-lg font-bold px-8 py-4 border-gray-300 dark:border-gray-700 text-black dark:text-white shadow-lg"
               >
                 Book a Demo
               </Button>

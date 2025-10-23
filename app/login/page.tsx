@@ -34,7 +34,7 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 to-purple-100">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 to-purple-100 dark:from-slate-900 dark:to-blue-900">
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader>
           <CardTitle>Sign in to Fleet OS</CardTitle>
