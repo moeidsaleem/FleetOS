@@ -15,8 +15,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 interface Message {
   id: string
   content: string
-  sender: 'user' | 'ai'
-  timestamp: Date
+  role: 'user' | 'assistant'
+  timestamp?: Date
   type?: 'text' | 'command' | 'status' | 'alert'
 }
 
@@ -49,10 +49,10 @@ function CommandCenter() {
   // Chat state management
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [messages, setMessages] = useState([
+  const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      role: 'assistant' as const,
+      role: 'assistant',
       content: 'Welcome to Fleet Command Center! I\'m your AI Fleet Commander powered by advanced AI. How can I assist you with your fleet operations today?'
     }
   ])
@@ -67,9 +67,9 @@ function CommandCenter() {
     e.preventDefault()
     if (!input.trim() || isLoading) return
 
-    const userMessage = {
+    const userMessage: Message = {
       id: Date.now().toString(),
-      role: 'user' as const,
+      role: 'user',
       content: input
     }
 
@@ -93,20 +93,42 @@ function CommandCenter() {
         throw new Error('Failed to get AI response')
       }
 
-      const data = await response.json()
-      
-      const aiMessage = {
+      // Handle streaming response
+      const reader = response.body?.getReader()
+      if (!reader) {
+        throw new Error('No response body')
+      }
+
+      let aiResponse = ''
+      const decoder = new TextDecoder()
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          
+          const chunk = decoder.decode(value, { stream: true })
+          aiResponse += chunk
+        }
+      } catch (streamError) {
+        console.error('Stream reading error:', streamError)
+        // Fallback: try to get the response as text
+        const textResponse = await response.text()
+        aiResponse = textResponse
+      }
+
+      const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        role: 'assistant' as const,
-        content: data.message || 'I apologize, but I couldn\'t process your request at the moment.'
+        role: 'assistant',
+        content: aiResponse || 'I apologize, but I couldn\'t process your request at the moment.'
       }
 
       setMessages(prev => [...prev, aiMessage])
     } catch (error) {
       console.error('Error getting AI response:', error)
-      const errorMessage = {
+      const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        role: 'assistant' as const,
+        role: 'assistant',
         content: 'I apologize, but I encountered an error. Please try again.'
       }
       setMessages(prev => [...prev, errorMessage])
