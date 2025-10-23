@@ -91,6 +91,7 @@ function MainNav() {
               </a>
             ))}
             <Link href="/login"><Button variant="outline" className="border-gray-300 dark:border-gray-700 text-black dark:text-white">Login</Button></Link>
+            <Link href="/signup"><Button variant="outline" className="border-gray-300 dark:border-gray-700 text-black dark:text-white">Sign Up</Button></Link>
             <Link href="/demo"><Button variant="outline" className="border-gray-300 dark:border-gray-700 text-black dark:text-white">Book a Demo</Button></Link>
             <Link href="/pricing"><Button className="bg-black dark:bg-white text-white dark:text-black hover:bg-gray-900 dark:hover:bg-gray-100">Get Started Free</Button></Link>
           </div>
@@ -121,6 +122,7 @@ function MainNav() {
                 <a key={item.title} href={item.href} className="py-3 px-2 text-lg font-medium text-gray-900 dark:text-gray-100 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => setMobileOpen(false)}>{item.title}</a>
               ))}
               <Link href="/login" className="py-2" onClick={() => setMobileOpen(false)}><Button variant="outline" className="w-full border-gray-300 dark:border-gray-700 text-black dark:text-white">Login</Button></Link>
+              <Link href="/signup" className="py-2" onClick={() => setMobileOpen(false)}><Button variant="outline" className="w-full border-gray-300 dark:border-gray-700 text-black dark:text-white">Sign Up</Button></Link>
               <Link href="/demo" className="py-2" onClick={() => setMobileOpen(false)}><Button variant="outline" className="w-full border-gray-300 dark:border-gray-700 text-black dark:text-white">Book a Demo</Button></Link>
               <div className="flex items-center gap-2 mt-2">
                 <Link href="/pricing" className="py-2" onClick={() => setMobileOpen(false)}><Button className="w-full bg-black dark:bg-white text-white dark:text-black hover:bg-gray-900 dark:hover:bg-gray-100">Get Started Free</Button></Link>
@@ -169,7 +171,7 @@ function HeroSection() {
               <span className="font-semibold text-black dark:text-white">FleetOps</span>—where AI meets reliability.
             </p>
           <div className="flex flex-col md:flex-row gap-4 justify-center md:justify-start mb-6">
-            <Link href="/pricing">
+            <Link href="/signup">
               <Button
                 size="lg"
                 className="bg-black dark:bg-white text-white dark:text-black text-lg font-bold px-8 py-4 shadow-lg"

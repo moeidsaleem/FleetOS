@@ -6,6 +6,7 @@ import { signIn } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import Link from "next/link"
 
 function LoginForm() {
   const [email, setEmail] = useState("")
@@ -67,6 +68,12 @@ function LoginForm() {
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Signing in..." : "Sign In"}
             </Button>
+            <div className="text-center text-sm text-gray-600">
+              Don't have an account?{" "}
+              <Link href="/signup" className="text-blue-600 hover:underline">
+                Sign up here
+              </Link>
+            </div>
           </form>
         </CardContent>
       </Card>
